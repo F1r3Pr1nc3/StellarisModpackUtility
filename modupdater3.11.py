@@ -1,5 +1,5 @@
 # @author: FirePrince
-stellaris_version = '3.10.4' # @version
+stellaris_version = '3.11.0' # @version
 # @revision: 2024/02/12
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
@@ -29,7 +29,7 @@ also_old = 0
 debug_mode = 0
 mergerofrules = 0 # TODO auto detect?
 keep_default_country_trigger = 0
-only_upto_version = "3.10" #  Should be number string
+only_upto_version = "3.11" #  Should be number string
 
 # TODO Deprecate values - replaced by var only_from_version !?
 # only_v3_8 = False
@@ -257,12 +257,36 @@ actuallyTargets = {
 	"targets3": {}, # Simple syntax
 	"targets4": {}  # Multiline syntax
 }
+
+"""== 3.11 Quick stats ==
+# the effect 'give_breakthrough_tech_option_or_progress_effect' has been introduced
+# the effect 'give_next_breakthrough_effect' has been introduced
+# the trigger leader_lifespan has been introduced
+# modifier ships_upkeep_mult could be replaced with ship_orbit_upkeep_mult
+Removed ...
+"""
+lastversion = v3_11 = { # BETA ONLY
+	"targetsR": [
+		[r"^\s+[^#]*?\btech_(society|physics|engineering)_\d", "Removed in 3.11 after having their function made redundant"],
+		[r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in 3.11"],
+	],
+	"targets3": {
+		r'\bgive_next_tech_society_option_effect = yes': 'give_next_breakthrough_effect = { AREA = society }',
+		# r"^(\s+[^#]*?)\bplanet_researchers_upkeep_mult = -?\d+\.?\d*": r'\1',
+		# r'^(\s+[^#]*?)\b\"?tech_(?:society|physics|engineering)_\d\"?\b\s?': r'\1',
+	},
+	"targets4": {
+		r"\bany_country = \{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"any_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"any_galcom_member = \1"],
+		r"\s(?:every|random|count)_country = \{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"\1_galcom_member = \2"],
+	}
+}
+
 """== 3.10 Quick stats ==
 # BTW: the modifier leader_age has been renamed to leader_lifespan_add, the trigger leader_lifespan has been introduced
 Removed paragon.5001 
 leader sub-classes merged
 """
-lastversion = v3_10 = {
+v3_10 = {
 	"targetsR": [
 		[r"^[^#]+?\w+(skill|weight|agent|frontier)_governor\b", "Possibly renamed to '_official' in 3.10"],
 		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in 3.10"], # TODO: needs to be more accurate
@@ -307,7 +331,7 @@ lastversion = v3_10 = {
 		r'^([^#]+?)\s+leader_trait_fanatic\b': r'\1 leader_trait_master_gunner',
 		r'^([^#]+?)\s+leader_trait_glory_seeker': r'\1 leader_trait_butcher',
 		r'^([^#]+?)\s+leader_trait_army_logistician(_\d)?\b': r'\1 leader_trait_energy_weapon_specialist',
-r'^([^#]+?)\s+leader_trait_fotd_admiral\b':r'\1leader_trait_fotd_commander',
+		r'^([^#]+?)\s+leader_trait_fotd_admiral\b': r'\1 leader_trait_fotd_commander',
 		# r'=\s*leader_trait_mining_focus\b': '= leader_trait_private_mines_2',
 		r'add_modifier = \{ modifier = space_storm \}': 'create_space_storm = yes',
 		r'remove_modifier = space_storm': 'destroy_space_storm = yes',
@@ -920,11 +944,18 @@ else:
 			],
 	   }
 	}
+	if only_upto_version == "3.11":
+		print("only_upto_version", only_upto_version)
+		only_upto_version = 3.96 # exception
 	if only_upto_version == "3.10":
 		print("only_upto_version", only_upto_version)
 		only_upto_version = 3.95 # exception
 	only_upto_version = float(only_upto_version)
 
+	if only_upto_version >= 3.96:
+		actuallyTargets["targetsR"].extend(v3_11["targetsR"])
+		actuallyTargets["targets3"].update(v3_11["targets3"])
+		actuallyTargets["targets4"].update(v3_11["targets4"])
 	if only_upto_version >= 3.95:
 		actuallyTargets["targetsR"].extend(v3_10["targetsR"])
 		actuallyTargets["targets3"].update(v3_10["targets3"])
