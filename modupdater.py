@@ -1,5 +1,6 @@
 # @author: FirePrince
-stellaris_version = '3.11.0' # @version
+only_upto_version = "3.11" #  Should be number string
+
 # @revision: 2024/02/12
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
@@ -29,7 +30,7 @@ also_old = 0
 debug_mode = 0
 mergerofrules = 0 # TODO auto detect?
 keep_default_country_trigger = 0
-only_upto_version = "3.11" #  Should be number string
+stellaris_version = '3.11.1' # @last supported version
 
 # TODO Deprecate values - replaced by var only_from_version !?
 # only_v3_8 = False
@@ -236,6 +237,8 @@ if mod_path is None or mod_path == '':
 # -country_admin_cap_add = 15
 # +country_unity_produces_mult = 0.05
 
+			
+vanilla_ethics = r"pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe"
 resource_items = r"energy|unity|food|minerals|influence|alloys|consumer_goods|exotic_gases|volatile_motes|rare_crystals|sr_living_metal|sr_dark_matter|sr_zro|(?:physics|society|engineering(?:_research))"
 no_trigger_folder = re.compile(r"^([^_]+)(_(?!trigger)[^/_]+|[^_]*$)(?(2)/([^_]+)_[^/_]+$)?") # 2lvl, only 1lvl folder: ^([^_]+)(_(?!trigger)[^_]+|[^_]*)$ only
 
@@ -292,7 +295,7 @@ v3_10 = {
 		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in 3.10"], # TODO: needs to be more accurate
 		[r"^[^#]+?\s+leader_trait_inspiring", "Removed in 3.10"], # TODO: needs to be more accurate
 		[r"\s+kill_leader = \{ type", "Probably outdated since 3.10"], # TODO: needs to be more accurate
-		(["common/traits"], [r'^[^#]+?is_councilor_trait', "Removed in 3.10"]),
+		(["common/traits"], [r'^[^#]+?is_councilor_trait', "Replaced in 3.10 with 'councilor_modifier' and 'force_councilor_trait = yes'"]),
 		(["common/traits", "common/governments/councilors"], [r"^\s+leader_class = \{\s*((?:admiral|general|governor)\s+){1,2}", "Needs to be replaced with 'official' or 'commander' in 3.10"]), # TODO
 	],
 	"targets3": {
@@ -300,8 +303,8 @@ v3_10 = {
 		r'\bleader_age\s*=\s*': 'leader_lifespan_add = ',
 		r"^on_survey\s*=\s*\{": ("common/on_actions", "on_survey_planet = {"),
 		r'^([^#]+?\w+gray_)governor\b': r'\1official',
-		r'class\s*=\s*("?)governor\b': r'class = \1official',
-		r'class\s*=\s*("?)(?:admiral|general)\b': r'class = \1commander',
+		r'(class|CLASS)\s*=\s*("?)governor\b': r'\1 = \2official',
+		r'(class|CLASS)\s*=\s*("?)(?:admiral|general)\b': r'\1 = \2commander',
 		r'=\s*subclass_governor_(?:visionary|economist|pioneer)': '= subclass_official_governor',
 		r'=\s*subclass_admiral_(?:tactician|aggressor|strategist)': '= subclass_commander_admiral',
 		r'=\s*subclass_general_(?:invader|protector|marshall)': '= subclass_commander_general',
@@ -334,6 +337,7 @@ v3_10 = {
 		r'^([^#]+?)\s+leader_trait_fotd_admiral\b': r'\1 leader_trait_fotd_commander',
 		# r'=\s*leader_trait_mining_focus\b': '= leader_trait_private_mines_2',
 		r'add_modifier = \{ modifier = space_storm \}': 'create_space_storm = yes',
+		r'\bassist_research_mult = ([-\d.]+)\b': lambda p: 'planet_researchers_produces_mult = ' + str(round(int(p.group(1))*0.4, 2)),
 		r'remove_modifier = space_storm': 'destroy_space_storm = yes',
 		r'(\s)num_pops\b': (["common/buildings", "common/decisions", "common/colony_types"], r'\1num_sapient_pops'), # WARNING: only on planet country (num_pops also pop_faction sector)
 		r'^(\s*)(valid_for_all_(?:ethics|origins)\b.*)': ("common/traits", r'\1# \2 removed in v3.10'),
@@ -900,8 +904,8 @@ else:
 			r"\s+every_planet_army = \{\s*remove_army = yes\s*\}": [r"every_planet_army = \{\s*remove_army = yes\s*\}", r"remove_all_armies = yes"],
 			r"\s(?:any|every|random)_neighbor_system = \{[^{}]+?\s+ignore_hyperlanes = (?:yes|no)\n?": [r"(_neighbor_system)( = \{[^{}]+?)\s+ignore_hyperlanes = (yes|no)\n?",
 				lambda p: p.group(1) + p.group(2) if p.group(3) == "no" else p.group(1) + "_euclidean" + p.group(2)],
-			r"\bNO[RT] = \{\s*has_ethic = \"?ethic_(?:(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s+has_ethic = \"?ethic_(?:(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s+\}": [r"NO[RT] = \{\s*has_ethic = \"?ethic_(?:(pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s+has_ethic = \"?ethic_(?:(?:\1|\2)|fanatic_(?:\1|\2))\"?\s+\}", (no_trigger_folder, r"is_\1\2 = no")],
-			r"\b(?:OR = \{)?\s+?has_ethic = \"?ethic_(?:(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s+has_ethic = \"?ethic_(?:(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(?:pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s*\}?": [r"(\bOR = \{)?(\s*?\n*?\s*?)?(?(1)\t?)has_ethic = \"?ethic_(?:(pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe)|fanatic_(pacifist|militarist|materialist|spiritualist|egalitarian|authoritarian|xenophile|xenophobe))\"?\s*?has_ethic = \"?ethic_(?:(?:\4|\3)|fanatic_(?:\4|\3))\"?\s*?(?(1)\})", (no_trigger_folder, r"\2is_\3\4 = yes")], # r"\4is_ethics_aligned = { ARG1 = \2\3 }",
+			r"\bNO[RT] = \{\s*has_ethic = \"?ethic_(?:(?:%s)|fanatic_(?:%s))\"?\s+has_ethic = \"?ethic_(?:(?:%s)|fanatic_(?:%s))\"?\s+\}" % (vanilla_ethics, vanilla_ethics, vanilla_ethics, vanilla_ethics): [r"NO[RT] = \{\s*has_ethic = \"?ethic_(?:(%s)|fanatic_(%s))\"?\s+has_ethic = \"?ethic_(?:(?:\1|\2)|fanatic_(?:\1|\2))\"?\s+\}" % (vanilla_ethics, vanilla_ethics), (no_trigger_folder, r"is_\1\2 = no")],
+			r"\b(?:OR = \{)?\s+?has_ethic = \"?ethic_(?:(?:%s)|fanatic_(?:%s))\"?\s+has_ethic = \"?ethic_(?:(?:%s)|fanatic_(?:%s))\"?\s*\}?" % (vanilla_ethics, vanilla_ethics, vanilla_ethics, vanilla_ethics): [r"(\bOR = \{)?(\s*?\n*?\s*?)?(?(1)\t?)has_ethic = \"?ethic_(?:(%s)|fanatic_(%s))\"?\s*?has_ethic = \"?ethic_(?:(?:\4|\3)|fanatic_(?:\4|\3))\"?\s*?(?(1)\})" % (vanilla_ethics, vanilla_ethics), (no_trigger_folder, r"\2is_\3\4 = yes")], # r"\4is_ethics_aligned = { ARG1 = \2\3 }",
 			### Boolean operator merge
 			# NAND <=> OR = { NOT
 			r"\s+OR = \{(?:\s*NOT = \{[^{}#]*?\})+\s*\}[ \t]*\n": [r"^(\s+)OR = \{\s*?\n(?:(\s+)NOT = \{\s+)?([^{}#]*?)\s*\}(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?(?:(\s+)?NOT = \{\s*([^{}#]*?)\s*\})?", r"\1NAND = {\n\2\3\4\5\6\7\8\9\10\11\12\13\14\15"], # up to 7 items (sub-trigger)
@@ -1031,13 +1035,36 @@ if also_old:
 	targets3[r"\bcountry_resource_(influence|unity)_"] = r"country_base_\1_produces_"
 	targets3[r"\bplanet_unrest_add"] = "planet_stability_add"
 	targets3[r"\bshipclass_military_station_hit_points_"] = "shipclass_military_station_hull_"
-	targets3[r"\borbital_bombardment"] = "has_orbital_bombardment_stance"
+	targets3[r"(.+?)\sorbital_bombardment = (\w{4:})"] = r"\1has_orbital_bombardment_stance = \2" # exclude country_type option
 	targets3[r"\bNAME_Space_Amoeba\b"] = "space_amoeba"
 	targets3[r"\btech_spaceport_(\d)\b"] = r"tech_starbase_\1"
 	targets3[r"\btech_mining_network_(\d)\b"] = r"tech_mining_\1"
 	targets3[r"\bgarrison_health\b"] = r"army_defense_health_mult"
 	targets3[r"\bplanet_jobs_minerals_mult\b"] = r"planet_jobs_minerals_produces_mult"
 	targets3[r"country_flag = flesh_weakened\b"] = r"country_flag = cyborg_empire"
+
+	targets3[r"\bhas_government = ([^g][^o][^v])"] = r"has_government = gov_\1"
+	targets3[r"\bgov_ordered_stratocracy\b"] = "gov_citizen_stratocracy"
+	targets3[r"\bgov_military_republic\b"] = "gov_military_commissariat"
+	targets3[r"\bgov_martial_demarchy\b"] = "gov_martial_empire"
+	targets3[r"\bgov_pirate_codex\b"] = "gov_pirate_haven"
+	targets3[r"\bgov_divine_mandate\b"] = "gov_divine_empire"
+	targets3[r"\bgov_transcendent_empire\b"] = "gov_theocratic_monarchy"
+	targets3[r"\bgov_transcendent_republic\b"] = "gov_theocratic_republic"
+	targets3[r"\bgov_transcendent_oligarchy\b"] = "gov_theocratic_oligarchy"
+	targets3[r"\bgov_irenic_democracy\b"] = "gov_moral_democracy"
+	targets3[r"\bgov_indirect_democracy\b"] = "gov_representative_democracy"
+	targets3[r"\bgov_democratic_utopia\b"] = "gov_direct_democracy"
+	targets3[r"\bgov_stagnated_ascendancy\b"] = "gov_stagnant_ascendancy"
+	targets3[r"\bgov_peaceful_bureaucracy\b"] = "gov_irenic_bureaucracy"
+	targets3[r"\bgov_irenic_protectorate\b"] = "gov_irenic_dictatorship"
+	targets3[r"\bgov_mega_corporation\b"] = "gov_megacorporation"
+	targets3[r"\bgov_primitive_feudalism\b"] = "gov_feudal_realms"
+	targets3[r"\bgov_fragmented_nations\b"] = "gov_fragmented_nation_states"
+	targets3[r"\bgov_illuminated_technocracy\b"] = "gov_illuminated_autocracy"
+	targets3[r"\bgov_subconscious_consensus\b"] = "gov_rational_consensus"
+	targets3[r"\bgov_ai_overlordship\b"] = "gov_despotic_hegemony"
+
 	# not sure because multiline
 	# targets3[r"(?<!add_resource = \{)(\s+)(%s)\s*([<=>]+\s*-?\s*(?:@\w+|\d+))" % resource_items] = (["common/scripted_triggers", "common/scripted_effects", "events"], r"\1has_resource = { type = \2 amount \3 }")
 	# tmp fix
@@ -1106,6 +1133,9 @@ if code_cosmetic and not only_warning:
 	### 3.4
 	targets4[r"\bNO[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [r"NO[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = no"]
 	targets4[r"\bOR = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [r"OR = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = yes"]
+	targets4[r"\b(is_fallen_empire = yes\s+is_machine_empire|is_machine_empire = yes\s+is_fallen_empire|is_fallen_empire_machine) = yes"] = "is_fallen_machine_empire = yes"
+	targets4[r"\b(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(?:%s)|has_ethic = ethic_fanatic_(?:%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics)] = [r"(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(%s)|has_ethic = ethic_fanatic_(%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics), r"is_fallen_empire_\1\2 = yes"] 
+
 	# is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes TODO
 		# is_robot_pop = no
 		# is_hive_species = no

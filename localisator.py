@@ -30,7 +30,7 @@ except: print("Not running Windows")
 #============== Initialize global variables ===============
 
 optimizeLoc = False   # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
-optimizeLocString = "Event" # only used if optimizeLoc is True
+optimizeLocString = "event" # only used if optimizeLoc is True
 
 loadVanillaLoc = False # True BETA: replaces exact matching strings with vanilla ones
 loadVanillaLocUpdateDefault = False # only usable if loadVanillaLoc
@@ -45,31 +45,43 @@ key_IGNORE = "" # stops copying over localisations keys with this starting patte
 # Write here your mod folder name and languages to replace/update
 # localModPath = ["more_midgame_crisis", ["russian", "spanish", "braz_por", "french", "polish", "simp_chinese"]]
 # localModPath = ["SEoOC", ["german", "russian", "spanish", "braz_por", "french", "polish"]]
-# localModPath = ["Starbase_Strong", ["russian", "simp_chinese", "french", "polish"]] # "braz_por",
 # localModPath = ["SEoOC", ["german", "russian", "spanish", "braz_por", "french", "polish"]]
 # localModPath = ["Nomads The wondering Void Farers", []] # "english"
 # localModPath = ["UAP", ["english", "german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese"]]
 # localModPath = ["Decentralized Empires", []] # ["spanish", "braz_por", "french", "polish", "simp_chinese"]
-localModPath = ["FATALF", ["english", "japanese", "korean"]]
 localModPath = ["prob", []]
 localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["E&CC", []]
 localModPath = ["c:/Games/steamapps/workshop/content/281990/2915166985", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Gray Tempest Shipset", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["distant_stars_overhaul", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["CrisisManager_Sleeper", ["french", "polish", "korean"]]
-localModPath = ["TheGreatKhanExpanded", ["english"]]
 localModPath = ["honor_leaders", ["japanese", "korean"]] 
-localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
-localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["ADeadlyTempest", ["english", "french", "polish", "japanese", "korean"]]
 localModPath = ["CrisisManager_MidGame", ["french", "polish", "korean"]]
-localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["CrisisManager_EndGame", ["french", "polish", "japanese", "korean"]]
+localModPath = ["Societal Advancement", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["Enhanced Gene Modding", ["spanish", "braz_por", "polish", "japanese"]]
+localModPath = ["The Storm Cluster", ["simp_chinese", "korean"]]
+localModPath = ["Engineers of Life", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["distant_stars_overhaul", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+# localModPath = ["Starbase_Strong", ["russian", "simp_chinese", "french", "polish", "japanese", "korean"]]
+localModPath = ["FATALF", ["english"]]
+localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
+localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
+localModPath = ["c:/Games/steamapps/workshop/content/281990/1657438030", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"]] # , "korean" partial
+localModPath = ["TheGreatKhanExpanded", []]
+localModPath = ["c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch", ["german", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["ADeadlyTempest", ["english", "french", "polish", "japanese", "korean"]]
+localModPath = ["Daemonic_Incursion", ["english"]]
+localModPath = ["Shroud Rising", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"]]
 
 
-# localModPath = ["c:\\Games\\steamapps\\workshop\\content\\281990\\2268189539\\", ["braz_por"]]
+# localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
 # local_OVERHAUL = ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]
 
 localModPath, local_OVERHAUL = localModPath
@@ -104,9 +116,9 @@ def replaceLoc(old, new, doc):
         new = r"\1 = " + trimDupe.sub(r'"\1"', new) + r"\2"
         # print("Search for:", old, new)
         for fname in optimizeLoc:
-            # print(fname)
             s = False
-            with io.open(fname, 'r' , encoding='utf-8', errors='replace') as f: #
+            with io.open(fname, 'r' , encoding='utf-8', errors='replace') as f:
+                print("Read file:", fname)
                 s = f.read()
                 if isinstance(s, bytes):
                     s = unicode(s, errors='replace')  
@@ -359,6 +371,7 @@ def writeStream(lang, stream, filename):
     "Write YAML file"
     filename = filename.replace(defaultLang, lang)
     lang = os.path.dirname(filename)
+    # print("Try creation of the directory: %s" % lang)
     if lang and not os.path.isdir(lang) or not os.path.exists(lang) or (not no_subfolder and not os.path.isdir(lang) or not os.path.exists(lang)):
         try:
             os.mkdir(lang)
