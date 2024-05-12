@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/05/10
+# @revision: 2024/05/12
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -25,10 +25,10 @@ from tkinter import messagebox
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 1
+code_cosmetic = 0
 also_old = 0
-debug_mode = 0
-mergerofrules = 1 # TODO auto detect?
+debug_mode = 0 # without writing file=log_file
+mergerofrules = 0 # TODO auto detect?
 keep_default_country_trigger = 0
 stellaris_version = '3.12.2' # @last supported version
 
@@ -194,6 +194,7 @@ while i < len(sys.argv):
 		i += 1
 	i += 1
 
+
 mod_outpath = '' # if you don't want to overwrite the original
 # mod_path = os.path.dirname(os.getcwd())
 
@@ -290,7 +291,14 @@ v3_11 = {
 				"veteran_class_locked_trait": "veteran"
 			}[p.group(1)]),
 		r'\badd_trait = leader_trait_(maniacal)': r'add_or_level_up_veteran_trait_effect = { TRAIT = leader_trait_\1 }',
-		r"^(\s+[^#]*?\btech_)((?:society|physics|engineering)_\d)": lambda p: p.group(1) + {
+	},
+	"targets4": {
+		r"\bany_country = \{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"any_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"any_galcom_member = \1"],
+		r"\s(?:every|random|count)_country = \{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"\1_galcom_member = \2"],
+	}
+}
+if code_cosmetic and not only_warning:
+	v3_11["targets3"][r"^(\s+[^#]*?\btech_)((?:society|physics|engineering)_\d)"] = lambda p: p.group(1) + {
 				"society_1": "genome_mapping",
 				"society_2": "colonization_3",
 				"society_3": "colonization_4",
@@ -301,12 +309,6 @@ v3_11 = {
 				"engineering_2": "space_mining_4",
 				"engineering_3": "advanced_metallurgy_2"
 			}[p.group(2)]
-	},
-	"targets4": {
-		r"\bany_country = \{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"any_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"any_galcom_member = \1"],
-		r"\s(?:every|random|count)_country = \{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"\1_galcom_member = \2"],
-	}
-}
 
 """== 3.10 Quick stats ==
 # BTW: the modifier leader_age has been renamed to leader_lifespan_add, the trigger leader_lifespan has been introduced
@@ -317,9 +319,12 @@ v3_10 = {
 	"targetsR": [
 		[r"^[^#]+?\w+(skill|weight|agent|frontier)_governor\b", "Possibly renamed to '_official' in v.3.10"],
 		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in 3.10 (planet, country)"], # Not really recommended: needs to be more accurate
+		[r"^[^#]+?\s+trait_ruler_(explorer|world_shaper)", "Removed in v.3.10"], # TODO
 		[r"^[^#]+?\s+leader_trait_inspiring", "Removed in v.3.10"], # TODO: needs to be more accurate
 		[r"\s+kill_leader = \{ type", "Probably outdated since 3.10"], # TODO: needs to be more accurate
+		(["common/traits"], [r'^[^#]+?\bai_categories', "Replaced in v.3.10 with 'inline_script'"]),
 		(["common/traits"], [r'^[^#]+?\b(?:is_)?councilor_trait', "Replaced in v.3.10 with 'councilor_modifier' or 'force_councilor_trait = yes'"]),
+		(["common/traits"], [r'^[^#]+?\bselectable_weight = @class_trait_weight', "Replaced in v.3.10 with inline_script'"]),
 		(["common/traits", "common/governments/councilors"], [r"^\s+leader_class = \{\s*((?:admiral|general|governor)\s+){1,2}", "Needs to be replaced with 'official' or 'commander' in 3.10"]), # TODO
 	],
 	"targets3": {
@@ -1254,11 +1259,18 @@ def iBox(title, prefil):  # , master
 	return answer
 
 #============== Set paths ===============
+
+
 def parse_dir():
-	global mod_path, mod_outpath
+	global mod_path, mod_outpath, log_file
 	if debug_mode: global start_time
+
+
+
+
 	files = []
 	mod_path = os.path.normpath(mod_path)
+
 	print("Welcome to Stellaris Mod-Updater-%s by F1r3Pr1nc3!" % stellaris_version)
 
 	if not os.path.isdir(mod_path):
@@ -1287,6 +1299,12 @@ def parse_dir():
 		print("\tLoading folder", mod_path)
 		start_time = datetime.datetime.now()
 
+	# Open the log file in append mode
+	log_file = os.path.join(mod_path, "console_output.log") 
+	if os.path.exists(log_file):
+		os.remove(log_file)
+	log_file = open(log_file, "a")
+
 	# if os.path.isfile(mod_path + os.sep + 'descriptor.mod'):
 	if os.path.exists(os.path.join(mod_path, 'descriptor.mod')):
 		files = glob.glob(mod_path + '/**', recursive=True)  # '\\*.txt'
@@ -1298,9 +1316,11 @@ def parse_dir():
 		if next(folders, -1) == -1:
 			files = glob.glob(mod_path + '/**', recursive=False)  # '\\*.txt'
 			if not files or not isinstance(files, list) and next(files, -1) == -1 and debug_mode:
-				print("Empty folder", mod_path) 
+				print("Empty folder", mod_path, file=log_file) 
+				print("Empty folder", mod_path, file=sys.stdout) 
 			else:
-				print("We have clear a sub-folder")
+				print("We have clear a sub-folder", file=log_file)
+				print("We have clear a sub-folder", file=sys.stdout)
 				modfix(files)
 		else:
 			# We have a main-folder?
@@ -1308,13 +1328,15 @@ def parse_dir():
 				if os.path.exists(os.path.join(_f, 'descriptor.mod')):
 					mod_path = _f
 					mod_outpath = os.path.join(mod_outpath, _f)
-					print(mod_path)
+					print(mod_path, file=log_file)
+					print(mod_path, file=sys.stdout)
 					files = glob.iglob(mod_path + '/**', recursive=True)  # '\\*.txt'
 					modfix(files)
 				else:
 					files = glob.glob(mod_path + '/**', recursive=True)  # '\\*.txt'
 					if next(iter(files), -1) != -1:
-						print("We have probably a mod sub-folder")
+						print("We have probably a mod sub-folder", file=log_file)
+						print("We have probably a mod sub-folder", file=sys.stdout)
 						modfix(files)
 
 
@@ -1330,7 +1352,8 @@ def modfix(file_list):
 		if os.path.isfile(_file) and _file.endswith('.txt'):
 			subfolder = os.path.relpath(_file, mod_path)
 			file_contents = ""
-			print("\tCheck file:", _file.encode(errors='replace'))
+			print("\tCheck file:", _file.encode(errors='replace'), file=log_file)
+			print("\tCheck file:", _file.encode(errors='replace'), file=sys.stdout)
 			with open(_file, 'r', encoding='utf-8', errors='ignore') as txtfile:
 				# out = txtfile.read() # full_fille
 				# try:
@@ -1375,7 +1398,8 @@ def modfix(file_list):
 							if rt:
 								rt = re.search(rt, line) # , flags=re.I
 							if rt:
-								print(" WARNING potential outdated or removed syntax%s: %s in line %i file %s\n" % (msg, rt.group(0).encode(errors='replace'), i, basename))
+								print(" WARNING potential outdated or removed syntax%s: %s in line %i file %s\n" % (msg, rt.group(0).encode(errors='replace'), i, basename), file=log_file)
+								print(" WARNING potential outdated or removed syntax%s: %s in line %i file %s\n" % (msg, rt.group(0).encode(errors='replace'), i, basename), file=sys.stdout)
 
 						# for pattern, repl in targets3.items(): old dict way
 						for pattern in targets3: # new list way
@@ -1391,7 +1415,8 @@ def modfix(file_list):
 
 								if debug_mode:
 									print("targets3", line.strip().encode(errors='replace'))
-									print(pattern, repl, file)
+									print(pattern, repl, file, file=log_file)
+									print(pattern, repl, file, file=sys.stdout)
 
 								if file in basename:
 									if debug_mode: print("\tFILE match:", file, basename)
@@ -1435,7 +1460,8 @@ def modfix(file_list):
 									# line = line.replace(t, r)
 									if line != rt:
 										changed = True
-										print("\tUpdated file: %s on %s (at line %i) with %s\n" % (basename, rt.strip().encode(errors='replace'), i, line.strip().encode(errors='replace')))
+										print("\tUpdated file: %s on %s (at line %i) with %s\n" % (basename, rt.strip().encode(errors='replace'), i, line.strip().encode(errors='replace')), file=log_file)
+										print("\tUpdated file: %s on %s (at line %i) with %s\n" % (basename, rt.strip().encode(errors='replace'), i, line.strip().encode(errors='replace')), file=sys.stdout)
 								#elif debug_mode and isinstance(folder, re.Pattern): print("DEBUG Match "targets3":", pattern, repl, type(repl), line.strip().encode(errors='replace'))
 
 					out += line
@@ -1483,12 +1509,14 @@ def modfix(file_list):
 										# print("ONLY GRP1:", type(replace), replace)
 									replace = re.sub(replace[0], replace[1], tar, flags=re.I|re.M|re.A)
 								if isinstance(repl, str) or (not isinstance(tar, tuple) and tar in out and tar != replace):
-									print("Match:\n", tar)
+									print("Match:\n", tar, file=log_file)
+									print("Match:\n", tar, file=sys.stdout)
 									if isinstance(tar, tuple):
 										tar = tar[0] # Take only first group
 										if debug_mode: print("\tFROM GROUP1:\n", pattern)
 									elif debug_mode: print("\tFROM:\n", pattern)
-									print("Multiline replace:\n", replace) # repr(
+									print("Multiline replace:\n", replace, file=log_file) # repr(
+									print("Multiline replace:\n", replace, file=sys.stdout) # repr(
 									out = out.replace(tar, replace)
 									changed = True
 								elif debug_mode:
@@ -1497,7 +1525,8 @@ def modfix(file_list):
 				if changed and not only_warning:
 					structure = os.path.normpath(os.path.join(mod_outpath, subfolder))
 					out_file = os.path.join(structure, basename)
-					print('\tWRITE FILE:', out_file.encode(errors='replace'))
+					print('\tWRITE FILE:', out_file.encode(errors='replace'), file=log_file)
+					print('\tWRITE FILE:', out_file.encode(errors='replace'), file=sys.stdout)
 					if not os.path.exists(structure):
 						os.makedirs(structure)
 						# print('Create folder:', subfolder)
@@ -1528,7 +1557,8 @@ def modfix(file_list):
 			m = re.search(pattern, out)
 			if m: m = m.group(1)
 			version_len = stellaris_version.rfind(".")
-			print(r'\nMain Version = %s (version_len = %s)' % (stellaris_version[0:version_len], version_len))
+			print(r'\nMain Version = %s (version_len = %s)' % (stellaris_version[0:version_len], version_len), file=log_file)
+			print(r'\nMain Version = %s (version_len = %s)' % (stellaris_version[0:version_len], version_len), file=sys.stdout)
 			if debug_mode: print(m, isinstance(m, str), len(m))
 			if isinstance(m, str) and m != stellaris_version and m[0:version_len] != stellaris_version[0:version_len]:
 				if re.search(r"\*", m):
@@ -1546,10 +1576,16 @@ def modfix(file_list):
 				pattern = re.compile(r'name=\"(.*?)\"\n')
 				pattern = re.search(pattern, out)
 				if pattern: pattern = pattern.group(1)
-				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version))
+				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version), file=log_file)
+				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version), file=sys.stdout)
 				open(_file, 'w', encoding='utf-8', errors='ignore').write(out)
 
-	print("\nDone!", mod_outpath.encode(errors='replace'))
+	print("\nDone!", mod_outpath.encode(errors='replace'), file=log_file)
+	print("\nDone!", mod_outpath.encode(errors='replace'), file=sys.stdout)
+
 
 parse_dir() # mod_path, mod_outpath
 # input("\nPRESS ANY KEY TO EXIT!")
+
+# Close the log file
+log_file.close()
