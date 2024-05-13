@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/05/12
+# @revision: 2024/05/13
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -25,10 +25,10 @@ from tkinter import messagebox
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0 # without writing file=log_file
-mergerofrules = 0 # TODO auto detect?
+mergerofrules = 1 # TODO auto detect?
 keep_default_country_trigger = 0
 stellaris_version = '3.12.2' # @last supported version
 
@@ -251,20 +251,34 @@ actuallyTargets = {
 
 lastversion = v3_12 = {
 	"targetsR": [
-		[r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b", "Removed in v.3.12, added in v.3.6"]
+		[r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b", "Removed in v.3.12, added in v.3.6"],
+		[r"^\s+[^#]*?\bstations_produces_mult\b", "Removed in v.3.12,"],
+		[r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v.3.12,"],
+		[r"^\s+[^#]*?\bactivate_crisis_progression = yes\b", "Since v.3.12 needs a crisis path"],
 	],
 	"targets3": {
 		r'\bset_gestalt_node_protrait_effect\b': 'set_gestalt_node_portrait_effect',
 		r'\bhas_synthethic_dawn = yes': 'host_has_dlc = "Synthetic Dawn Story Pack"',  # 'has_synthetic_dawn', enable it later for backward compat.
 		r'\bhas_origin = origin_post_apocalyptic\b': 'is_apocalyptic_empire = yes',
 		r'\bhas_origin = origin_subterranean\b': 'is_subterranean_empire = yes',
+		r'\bhas_origin = origin_void_dwellers\b': 'has_void_dweller_origin = yes',
 		r'\bhas_valid_civic = civic_pleasure_seekers\b': 'is_pleasure_seeker = yes',
+		r'\btr_cybernetics_assembly_standards\b': 'tr_cybernetics_augmentation_overload',
+		r'\btr_cybernetics_assimilator_crucible\b': 'tr_cybernetics_assimilator_gestation',
+		r'\btr_synthetics_synthetic_age\b': 'tr_synthetics_transubstatiation_synthesis',
+		r'\bactivate_crisis_progression = yes\b': 'activate_crisis_progression = nemesis_path',
+		r'\@faction_base_unity\b': '@faction_base_output',
 		r'\bis_(berserk_)?fallen_machine_empire\b': r'is_fallen_empire_\1machine', # From 1.9
 	},
 	"targets4": {
-		r'\bOR = {\s*(has_ascension_perk = ap_mind_over_matter\s*has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s*has_ascension_perk = ap_mind_over_matter)\s*\} ': "has_psionic_ascension = yes"
+		r'\bOR = \{\s*(has_ascension_perk = ap_mind_over_matter\s*has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s*has_ascension_perk = ap_mind_over_matter)\s*\}': "has_psionic_ascension = yes",
+		r'\bOR = \{\s*(has_ascension_perk = ap_synthetic_(?:evolution|age)\s*has_origin = origin_synthetic_fertility|has_origin = origin_synthetic_fertility\s*has_ascension_perk = ap_synthetic_(?:evolution|age))\s*\}': "has_synthetic_ascension = yes",
 	}
 }
+if code_cosmetic and not only_warning:
+	v3_12["targets3"][r'\bhas_ascension_perk = ap_engineered_evolution\b'] = 'has_genetic_ascension = yes'
+	v3_12["targets4"][r'\bOR = \{\s*has_valid_civic = civic_(hive_)?natural_design\s*has_valid_civic = civic_(hive_)?natural_design\s*\}'] = 'is_natural_design_empire = yes'
+
 
 """== 3.11 Quick stats ==
 # the effect 'give_breakthrough_tech_option_or_progress_effect' has been introduced
@@ -1352,7 +1366,7 @@ def modfix(file_list):
 		if os.path.isfile(_file) and _file.endswith('.txt'):
 			subfolder = os.path.relpath(_file, mod_path)
 			file_contents = ""
-			print("\tCheck file:", _file.encode(errors='replace'), file=log_file)
+			# print("\tCheck file:", _file.encode(errors='replace'), file=log_file)
 			print("\tCheck file:", _file.encode(errors='replace'), file=sys.stdout)
 			with open(_file, 'r', encoding='utf-8', errors='ignore') as txtfile:
 				# out = txtfile.read() # full_fille
