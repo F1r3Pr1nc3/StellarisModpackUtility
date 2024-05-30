@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/05/13
+# @revision: 2024/05/30
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -21,6 +21,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 
 
+stellaris_version = '3.12.3' # @last supported version
 # Default values
 mod_path = ''
 only_warning = 0
@@ -30,7 +31,7 @@ also_old = 0
 debug_mode = 0 # without writing file=log_file
 mergerofrules = 1 # TODO auto detect?
 keep_default_country_trigger = 0
-stellaris_version = '3.12.2' # @last supported version
+output_log = 0 # TODO
 
 # TODO Deprecate values - replaced by var only_from_version !?
 # only_v3_8 = False
@@ -249,6 +250,11 @@ actuallyTargets = {
 	"targets4": {}  # Multiline syntax
 }
 
+"""== 3.12 Quick stats ==
+Any portrait definition in species_classes is moved to new portrait_sets database
+Removed obsolete is_researching_area from 3.8
+
+"""
 lastversion = v3_12 = {
 	"targetsR": [
 		[r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b", "Removed in v.3.12, added in v.3.6"],
@@ -259,25 +265,27 @@ lastversion = v3_12 = {
 	"targets3": {
 		r'\bset_gestalt_node_protrait_effect\b': 'set_gestalt_node_portrait_effect',
 		r'\bhas_synthethic_dawn = yes': 'host_has_dlc = "Synthetic Dawn Story Pack"',  # 'has_synthetic_dawn', enable it later for backward compat.
-		r'\bhas_origin = origin_post_apocalyptic\b': 'is_apocalyptic_empire = yes',
-		r'\bhas_origin = origin_subterranean\b': 'is_subterranean_empire = yes',
-		r'\bhas_origin = origin_void_dwellers\b': 'has_void_dweller_origin = yes',
-		r'\bhas_valid_civic = civic_pleasure_seekers\b': 'is_pleasure_seeker = yes',
+		r'\bhas_origin = origin_post_apocalyptic\b': (no_trigger_folder, 'is_apocalyptic_empire = yes'),
+		r'\bhas_origin = origin_subterranean\b': (no_trigger_folder, 'is_subterranean_empire = yes'),
+		r'\bhas_origin = origin_void_dwellers\b': (no_trigger_folder, 'has_void_dweller_origin = yes'),
 		r'\btr_cybernetics_assembly_standards\b': 'tr_cybernetics_augmentation_overload',
 		r'\btr_cybernetics_assimilator_crucible\b': 'tr_cybernetics_assimilator_gestation',
 		r'\btr_synthetics_synthetic_age\b': 'tr_synthetics_transubstatiation_synthesis',
 		r'\bactivate_crisis_progression = yes\b': 'activate_crisis_progression = nemesis_path',
 		r'\@faction_base_unity\b': '@faction_base_output',
+		r'\bd_hab_nanites_1\b': 'd_hab_nanites_3',
 		r'\bis_(berserk_)?fallen_machine_empire\b': r'is_fallen_empire_\1machine', # From 1.9
+		r'\bgovernment_election_years_(add|mult)\b': r'election_term_years_\1', # 3.12.3
 	},
 	"targets4": {
-		r'\bOR = \{\s*(has_ascension_perk = ap_mind_over_matter\s*has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s*has_ascension_perk = ap_mind_over_matter)\s*\}': "has_psionic_ascension = yes",
-		r'\bOR = \{\s*(has_ascension_perk = ap_synthetic_(?:evolution|age)\s*has_origin = origin_synthetic_fertility|has_origin = origin_synthetic_fertility\s*has_ascension_perk = ap_synthetic_(?:evolution|age))\s*\}': "has_synthetic_ascension = yes",
+		r'\bOR = \{\s*(?:has_ascension_perk = ap_mind_over_matter\s+has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s+has_ascension_perk = ap_mind_over_matter)\s*\}': (no_trigger_folder, "has_psionic_ascension = yes"),
+		r'\bOR = \{\s*(?:has_ascension_perk = ap_synthetic_(?:evolution|age)\s+has_origin = origin_synthetic_fertility|has_origin = origin_synthetic_fertility\s+has_ascension_perk = ap_synthetic_(?:evolution|age))\s*\}': (no_trigger_folder, "has_synthetic_ascension = yes"),
 	}
 }
 if code_cosmetic and not only_warning:
-	v3_12["targets3"][r'\bhas_ascension_perk = ap_engineered_evolution\b'] = 'has_genetic_ascension = yes'
-	v3_12["targets4"][r'\bOR = \{\s*has_valid_civic = civic_(hive_)?natural_design\s*has_valid_civic = civic_(hive_)?natural_design\s*\}'] = 'is_natural_design_empire = yes'
+	v3_12["targets3"][r'\bhas_ascension_perk = ap_engineered_evolution\b'] = (no_trigger_folder, 'has_genetic_ascension = yes')
+	v3_12["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:hive_)?natural_design\s+?){2}'] = (no_trigger_folder, 'is_natural_design_empire = yes')
+	v3_12["targets4"][r'(?:is_country_type = (?:(?:awakened_)?synth_queen(?:_storm)?\s*?)){3}'] = (no_trigger_folder, 'is_synth_queen_country_type = yes')
 
 
 """== 3.11 Quick stats ==
@@ -292,6 +300,7 @@ v3_11 = {
 	"targetsR": [
 		[r"^\s+[^#]*?\btech_(society|physics|engineering)_\d", "Removed in v.3.11 after having their function made redundant"],
 		[r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in v.3.11"],
+		[r"^\s+[^#]*?\bstation_uninhabitable_category", "Removed in v.3.11"],
 	],
 	"targets3": {
 		r'\bgive_next_tech_society_option_effect = yes': 'give_next_breakthrough_effect = { AREA = society }',
@@ -332,14 +341,14 @@ leader sub-classes merged
 v3_10 = {
 	"targetsR": [
 		[r"^[^#]+?\w+(skill|weight|agent|frontier)_governor\b", "Possibly renamed to '_official' in v.3.10"],
-		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in 3.10 (planet, country)"], # Not really recommended: needs to be more accurate
+		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in v.3.10 (planet, country)"], # Not really recommended: needs to be more accurate
 		[r"^[^#]+?\s+trait_ruler_(explorer|world_shaper)", "Removed in v.3.10"], # TODO
-		[r"^[^#]+?\s+leader_trait_inspiring", "Removed in v.3.10"], # TODO: needs to be more accurate
+		[r"^[^#]+?\s+leader_trait_inspiring", "Removed in v.3.10, possible replacing by leader_trait_crusader"], # TODO: needs to be more accurate
 		[r"\s+kill_leader = \{ type", "Probably outdated since 3.10"], # TODO: needs to be more accurate
 		(["common/traits"], [r'^[^#]+?\bai_categories', "Replaced in v.3.10 with 'inline_script'"]),
 		(["common/traits"], [r'^[^#]+?\b(?:is_)?councilor_trait', "Replaced in v.3.10 with 'councilor_modifier' or 'force_councilor_trait = yes'"]),
 		(["common/traits"], [r'^[^#]+?\bselectable_weight = @class_trait_weight', "Replaced in v.3.10 with inline_script'"]),
-		(["common/traits", "common/governments/councilors"], [r"^\s+leader_class = \{\s*((?:admiral|general|governor)\s+){1,2}", "Needs to be replaced with 'official' or 'commander' in 3.10"]), # TODO
+		(["common/traits", "common/governments/councilors"], [r"^\s+leader_class = \{\s*((?:admiral|general|governor)\s+){1,2}", "Needs to be replaced with 'official' or 'commander' in v.3.10"]), # TODO
 	],
 	"targets3": {
 		r'\bcan_fill_specialist_job\s*=': 'can_fill_specialist_job_trigger =',
@@ -408,7 +417,7 @@ v3_10_rev = { # BETA ONLY
 }
 v3_9 = {
 	"targetsR": [
-		[r"^[^#]+?\sland_army\s", "Removed army parameter from 3.8 in 3.9:"], # only from 3.8
+		[r"^[^#]+?\sland_army\s", "Removed army parameter from v.3.8 in v.3.9:"], # only from 3.8
 		[r"^[^#]+?\bhabitat_0\s", "Removed in v.3.9: replaceable with 'major_orbital'"], # only from 3.8
 		[r"^[^#]+?\sdistrict_hab_cultural", "Removed in v.3.9: replaceable with 'district_hab_housing'?"],
 		[r"^[^#]+?\sdistrict_hab_commercial", "Removed in v.3.9: replaceable with 'district_hab_energy'?"],
@@ -500,6 +509,7 @@ v3_8 = {
 		r"\s*[^#]*?\bleader_trait = (?:all|\{\s*\w+\s*\})\s*": ("common/traits", ""),
 		r'(\s*[^#]*?)\bleader_class ?= ?\"?ruler\"?': ("prescripted_countries", r'\1leader_class="governor"'),
 		r'\bleader_class = ruler\b': 'is_ruler = yes',
+		r'\s*[^#]*?\bis_researching_area = \w+': '',
 		# r"\s+traits = \{\s*\}\s*": "",
 		r"\bmerg_is_standard_empire = (yes|no)": r"is_default_or_fallen = \1",  # v3.8 former merg_is_standard_empire Merger Rule now vanilla
 		# r"\bspecies = \{ has_trait = trait_hive_mind \}": r'is_hive_species = yes',
@@ -860,8 +870,13 @@ v3_1 = {
 		r"\bset_variable = \{\s*which = \"?\w+\"?\s+value = (?:event_target:[^\d:{}#\s=\.]+|(prev\.?|from\.?|root|this|megastructure|planet|country|owner|controller|space_owner|ship|pop|fleet|galactic_object|leader|army|ambient_object|species|pop_faction|war|federation|starbase|deposit|sector|archaeological_site|first_contact|spy_network|espionage_operation|espionage_asset)+)\s*\}": [r"set_variable = \{\s*which = \"?(\w+)\"?\s+value = (event_target:\w+|\w+)\s*\}", r"set_variable = { which = \1 value = \2.\1 }"],
 		r"\s+spawn_megastructure = \{[^{}#]+?location = [\w\._:]+": [r"(spawn_megastructure = \{[^{}#]+?)location = ([\w\._:]+)", r"\1coords_from = \2"],
 		r"\s+modifier = \{\s*mult\b": [r"\bmult\b", "factor"],
-   }
+   }  
 }
+if code_cosmetic and not only_warning:
+	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:corporate_)?crafters\s+?){2}'] = (no_trigger_folder, 'is_crafter_empire = yes')
+	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:pleasure_seekers|corporate_hedonism)\s+?){2}'] = (no_trigger_folder, 'is_pleasure_seeker = yes')
+	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing\s+?){3:4}'] = (no_trigger_folder, 'is_catalytic_empire = yes')
+
 # 3.0 removed ai_weight for buildings except branch_office_building = yes
 v3_0 = {
 	"targetsR": [
@@ -912,11 +927,13 @@ v3_0 = {
 		r"\s+random_system_planet = \{\s*limit = \{\s*is_primary_star = yes\s*\}": [r"(\s+)random_system_planet = \{\s*limit = \{\s*is_primary_star = yes\s*\}", r"\1star = {"], # TODO works only on single star systems
 		r"\s+random_system_planet = \{\s*limit = \{\s*is_star = yes\s*\}": [r"(\s+)random_system_planet = \{\s*limit = \{\s*is_star = yes\s*\}", r"\1star = {"], # TODO works only on single star systems
 		r"\bcreate_leader = \{[^{}]+?\s+type = \w+": [r"(create_leader = \{[^{}]+?\s+)type = (\w+)", r"\1class = \2"],
-
 		r"\s(?:every|random|count)_(?:playable_)?country = \{[^{}#]*limit = \{\s*(?:NO[TR] = \{)?\s*is_same_value\b": ["is_same_value", "is_same_empire"],
+		r"\bOR = \{\s*(has_crisis_level = crisis_level_5\s+|has_country_flag = declared_crisis){2}\}": "has_been_declared_crisis = yes",
 
-   }
+    }
 }
+if code_cosmetic and not only_warning:
+	v3_0["targets3"][r'\bhas_crisis_level = crisis_level_5\b'] = (no_trigger_folder, 'has_been_declared_crisis = yes')
 
 if only_actual: actuallyTargets = lastversion
 # if only_actual or only_v3_8: actuallyTargets = v3_8
@@ -1225,11 +1242,15 @@ if mergerofrules:
 	targets4[r"\bOR = \{\s*(?:merg_is_(?:default_empire|awakened_fe) = yes\s+){2}\}"] = "is_country_type_with_subjects = yes"
 	targets4[r"\bNO[RT] = \{\s*(?:merg_is_(?:default|fallen)_empire = yes\s+){2}\}"] = "is_default_or_fallen = no"
 	targets4[r"\bOR = \{\s*(?:merg_is_(?:default|fallen)_empire = yes\s+){2}\}"] = "is_default_or_fallen = yes"
+	targets4[r'\b(?:is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\s*?){5}'] = (no_trigger_folder, "is_endgame_crisis = yes")
+	targets4[r'\b(?:(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\s*?){2:3}'] = (no_trigger_folder, "is_endgame_crisis = yes")
+
 	if not keep_default_country_trigger:
 		targets3[r"\bis_country_type = default\b"] = (no_trigger_folder, "merg_is_default_empire = yes")
 	targets3[r"\bis_country_type = fallen_empire\b"] = (no_trigger_folder, "merg_is_fallen_empire = yes")
 	targets3[r"\bis_country_type = awakened_fallen_empire\b"] = (no_trigger_folder, "merg_is_awakened_fe = yes")
 	targets3[r"\b(is_planet_class = pc_habitat\b|is_pd_habitat = yes)"] = (no_trigger_folder, "merg_is_habitat = yes")
+	targets3[r"\bis_planet_class = pc_relic"] = (no_trigger_folder, "merg_is_relic_world = yes")
 	targets3[r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)"] = (no_trigger_folder, "merg_is_machine_world = yes")
 	targets3[r"\b(is_planet_class = pc_city\b|is_pd_arcology = yes|is_city_planet = yes)"] = (no_trigger_folder, "merg_is_arcology = yes")
 	targets3[r"\b(is_planet_class = pc_ringworld_habitable\b|uses_district_set = ring_world\b|is_planetary_diversity_ringworld = yes|is_giga_ringworld = yes)"] = (no_trigger_folder, "merg_is_hab_ringworld = yes")
@@ -1314,7 +1335,7 @@ def parse_dir():
 		start_time = datetime.datetime.now()
 
 	# Open the log file in append mode
-	log_file = os.path.join(mod_path, "console_output.log") 
+	log_file = os.path.join(mod_path, "modupdater.log") 
 	if os.path.exists(log_file):
 		os.remove(log_file)
 	log_file = open(log_file, "a")
@@ -1454,7 +1475,6 @@ def modfix(file_list):
 											rt = True
 								# elif subfolder in folder:
 								elif isinstance(folder, str):
-									#  and folder == "common/ai_budget"
 									# if debug_mode: print("subfolder in folder", subfolder, folder)
 									if subfolder in folder:
 										rt = True
@@ -1493,7 +1513,7 @@ def modfix(file_list):
 							rt = False
 							replace = repl
 							if isinstance(repl, list) and isinstance(repl[1], tuple):
-								# print('Has folder check')
+								# if debug_mode: print('Has folder check')
 								replace = repl.copy()
 								# folder = repl[1][0]
 								# replace[1] = repl[1][1]
@@ -1513,6 +1533,26 @@ def modfix(file_list):
 								elif isinstance(folder, re.Pattern) and folder.search(subfolder):
 									# print("Check folder (regexp)", subfolder)
 									rt = True
+								else: rt = False
+							elif isinstance(repl, tuple):
+								# if debug_mode: print('Has folder check simple')
+								folder, replace = repl
+								# if debug_mode: print("subfolder", subfolder, folder)
+								if isinstance(folder, list):
+									for fo in folder:
+										if subfolder in fo:
+											rt = True
+								# elif subfolder in folder:
+								elif isinstance(folder, str):
+									# if debug_mode: print("subfolder in folder", subfolder, folder)
+									if subfolder in folder:
+										rt = True
+										# if debug_mode: print(folder)
+								elif isinstance(folder, re.Pattern):
+									if folder.search(subfolder):
+										# if debug_mode: print("Check folder (regexp) True", subfolder, repl)
+										rt = True
+									# elif debug_mode: print("Folder EXCLUDED:", subfolder, repl)
 								else: rt = False
 							else: rt = True
 							if rt:
