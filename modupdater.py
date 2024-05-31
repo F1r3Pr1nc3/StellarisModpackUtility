@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/05/30
+# @revision: 2024/05/31
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -26,10 +26,10 @@ stellaris_version = '3.12.3' # @last supported version
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 1
+code_cosmetic = 0
 also_old = 0
 debug_mode = 0 # without writing file=log_file
-mergerofrules = 1 # TODO auto detect?
+mergerofrules = 0 # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0 # TODO
 
@@ -252,7 +252,7 @@ actuallyTargets = {
 
 """== 3.12 Quick stats ==
 Any portrait definition in species_classes is moved to new portrait_sets database
-Removed obsolete is_researching_area from 3.8
+Removed obsolete is_researching_area and research_leader triggers.
 
 """
 lastversion = v3_12 = {
@@ -261,6 +261,7 @@ lastversion = v3_12 = {
 		[r"^\s+[^#]*?\bstations_produces_mult\b", "Removed in v.3.12,"],
 		[r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v.3.12,"],
 		[r"^\s+[^#]*?\bactivate_crisis_progression = yes\b", "Since v.3.12 needs a crisis path"],
+		(['common/technology'], [r"^\s+[^#]*?\bresearch_leader\b","Leads to CTD in v.3.12.3! Obsolete since v.3.8"]),
 	],
 	"targets3": {
 		r'\bset_gestalt_node_protrait_effect\b': 'set_gestalt_node_portrait_effect',
@@ -517,7 +518,8 @@ v3_8 = {
 	"targets4": {
 		r"\s+traits = \{\s*\}": "",
 		r"(?:exists = sector\n?\s+)?\s*sector = \{\s+exists = leader\b": [r"(exists = sector\n?\s+)?(\s*sector = \{\s+exists = )leader\b", r"\1\2sector_capital.leader"],
-		r"research_leader = \{\s+area = \w+\s+has_trait = \"?\w+\"?\s+\}": [r"research_leader = \{\s+area = \w+\s+has_trait = \"?(\w+)\"?\s+\}", ('common/technology', r"has_trait_in_council = { TRAIT = \1 }")],
+		# TODO Needs still WARNING anyway as it is not fully perfect replace yet
+		r"(\bresearch_leader = \{\s+area = \w+\s+(\w+ = \{)?[^{}#]+(?(2)[^{}#]+\})\s+\})": [r"research_leader = \{\s+area = \w+\s+(\w+ = \{\s*?)?has_trait = \"?(\w+)\"?(?(1)[^{}#]+\})\s+\}", ('common/technology', lambda p: p.group(1) + "has_trait_in_council = { TRAIT = "+p.group(2)+" } }" if p.group(2) else "has_trait_in_council = { TRAIT = "+p.group(1)+" }")],
 		r"\b(?:OR|NO[RT]) = \{\s*is_(?:default_or_fallen|synthetic_empire) = yes\s*\}": [r"\b(OR|NO[RT]) = \{\s*is_(default_or_fallen|synthetic_empire) = yes\s*\}", lambda p: "is_"+p.group(2)+" = "+{"OR": "yes", "NO": "no"}[p.group(1)[0:2].upper()]],
 		# with is_country_type_with_subjects & without AFE but with is_fallen_empire
 		r"\b(?:(?:(?:is_country_type = default|merg_is_default_empire = yes|is_country_type_with_subjects = yes)\s+is_fallen_empire = yes)|(?:is_fallen_empire = yes\s+(?:is_country_type = default|merg_is_default_empire = yes|is_country_type_with_subjects = yes)))\s+": [r"\b((?:is_country_type = default|merg_is_default_empire = yes|is_fallen_empire = yes|is_country_type_with_subjects = yes)(\s+)){2,}", (no_trigger_folder, r"is_default_or_fallen = yes\2")],
@@ -928,7 +930,7 @@ v3_0 = {
 		r"\s+random_system_planet = \{\s*limit = \{\s*is_star = yes\s*\}": [r"(\s+)random_system_planet = \{\s*limit = \{\s*is_star = yes\s*\}", r"\1star = {"], # TODO works only on single star systems
 		r"\bcreate_leader = \{[^{}]+?\s+type = \w+": [r"(create_leader = \{[^{}]+?\s+)type = (\w+)", r"\1class = \2"],
 		r"\s(?:every|random|count)_(?:playable_)?country = \{[^{}#]*limit = \{\s*(?:NO[TR] = \{)?\s*is_same_value\b": ["is_same_value", "is_same_empire"],
-		r"\bOR = \{\s*(has_crisis_level = crisis_level_5\s+|has_country_flag = declared_crisis){2}\}": "has_been_declared_crisis = yes",
+		r"\bOR = \{\s*(has_crisis_level = crisis_level_5\s+|has_country_flag = declared_crisis){2}\}": (["common/scripted_effects", "events"], "has_been_declared_crisis = yes"),
 
     }
 }
@@ -1264,7 +1266,9 @@ if mergerofrules:
 else:
 	targets3[r"\bmerg_is_hab_ringworld ="] = "has_ringworld_output_boost ="
 	targets3[r"\bowner = { merg_is_default_empire = (yes|no) \}"] = r"can_generate_trade_value = \1"
-	targets3[r"\bmerg_is_hive_world = (yes|no)"] = lambda p: {"yes": "is_planet_class = pc_hive", "no": "NOT = { is_planet_class = pc_hive }"}[p.group(1)]
+	targets3[r"\bmerg_is_(hive|relic|machine)_world = (yes|no)"] = lambda p: {"yes": "is_planet_class = pc_"+p.group(1), "no": "NOT = { is_planet_class = pc_"+p.group(1)+" }"}[p.group(2)]
+	targets3[r"\bmerg_is_habitat = (yes|no)"] = lambda p: {"yes": "is_planet_class = pc_habitat", "no": "NOT = { is_planet_class = pc_habitat }"}[p.group(1)]
+	targets3[r"\bmerg_is_arcolog = (yes|no)"] = lambda p: {"yes": "is_planet_class = pc_city", "no": "NOT = { is_planet_class = pc_city }"}[p.group(1)]
 
 
 if debug_mode:
