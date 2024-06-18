@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/05/31
+# @revision: 2024/06/18
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -21,7 +21,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 
 
-stellaris_version = '3.12.3' # @last supported version
+stellaris_version = '3.12.5' # @last supported version
 # Default values
 mod_path = ''
 only_warning = 0
@@ -253,7 +253,7 @@ actuallyTargets = {
 """== 3.12 Quick stats ==
 Any portrait definition in species_classes is moved to new portrait_sets database
 Removed obsolete is_researching_area and research_leader triggers.
-
+is_individual_machine = { founder_species = { is_archetype = MACHINE } is_gestalt = no }
 """
 lastversion = v3_12 = {
 	"targetsR": [
@@ -286,6 +286,7 @@ lastversion = v3_12 = {
 if code_cosmetic and not only_warning:
 	v3_12["targets3"][r'\bhas_ascension_perk = ap_engineered_evolution\b'] = (no_trigger_folder, 'has_genetic_ascension = yes')
 	v3_12["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:hive_)?natural_design\s+?){2}'] = (no_trigger_folder, 'is_natural_design_empire = yes')
+	v3_12["targets4"][r'(?:has_origin = origin_cybernetic_creed\s+has_country_flag = cyber_creed_advanced_government|has_country_flag = cyber_creed_advanced_government\s+has_origin = origin_cybernetic_creed)'] = (no_trigger_folder, 'is_cyber_creed_advanced_government = yes')
 	v3_12["targets4"][r'(?:is_country_type = (?:(?:awakened_)?synth_queen(?:_storm)?\s*?)){3}'] = (no_trigger_folder, 'is_synth_queen_country_type = yes')
 
 
@@ -300,7 +301,7 @@ Removed ...
 v3_11 = {
 	"targetsR": [
 		[r"^\s+[^#]*?\btech_(society|physics|engineering)_\d", "Removed in v.3.11 after having their function made redundant"],
-		[r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in v.3.11"],
+		# [r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in v.3.11"], ??
 		[r"^\s+[^#]*?\bstation_uninhabitable_category", "Removed in v.3.11"],
 	],
 	"targets3": {
@@ -319,6 +320,7 @@ v3_11 = {
 	"targets4": {
 		r"\bany_country = \{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"any_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"any_galcom_member = \1"],
 		r"\s(?:every|random|count)_country = \{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))", r"\1_galcom_member = \2"],
+		r'\b(?:(?:is_planet_class = pc_(?:city|relic)|merg_is_(?:arcology|relic_world) = yes)\s*?){2}': (no_trigger_folder, "is_urban_planet = yes"),
 	}
 }
 if code_cosmetic and not only_warning:
@@ -342,7 +344,7 @@ leader sub-classes merged
 v3_10 = {
 	"targetsR": [
 		[r"^[^#]+?\w+(skill|weight|agent|frontier)_governor\b", "Possibly renamed to '_official' in v.3.10"],
-		[r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in v.3.10 (planet, country)"], # Not really recommended: needs to be more accurate
+		# [r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in v.3.10 (planet, country)"], # Not really recommended: needs to be more accurate
 		[r"^[^#]+?\s+trait_ruler_(explorer|world_shaper)", "Removed in v.3.10"], # TODO
 		[r"^[^#]+?\s+leader_trait_inspiring", "Removed in v.3.10, possible replacing by leader_trait_crusader"], # TODO: needs to be more accurate
 		[r"\s+kill_leader = \{ type", "Probably outdated since 3.10"], # TODO: needs to be more accurate
@@ -402,7 +404,7 @@ v3_10 = {
 	"targets4": {
 		r'\bleader_class\s*=\s*"?commander"?\s+leader_class\s*=\s*"?commander"?\b': "leader_class = commander",
 		# r"^\s+leader_class = \{\s*((?:admiral|scientist|general|governor)\s+){1,4}": [r'(admiral|general|governor)', (["common/traits", "common/governments/councilors"], lambda p: {"governor": "official", "admiral": "commander", "general": "commander" }[p.group(1)])],
-		r"OR\s*=\s*\{\s*(?:has_modifier\s*=\s*(?:toxic_|frozen_)?terraforming_candidate\s+){2:3}\}": "is_terraforming_candidate = yes",
+		r"OR\s*=\s*\{\s*(?:has_modifier\s*=\s*(?:toxic_|frozen_)?terraforming_candidate\s+){2,3}\}": "is_terraforming_candidate = yes",
 	}
 }
 
@@ -646,8 +648,8 @@ v3_4 = {
 		# r"\s+every_owned_fleet = \{\s+limit\b": [r"owned_fleet", r"controlled_fleet"], # only playable empire and not with is_ship_size!?
 		# r"\s+(?:any|every|random)_owned_ship = \{": [r"(any|every|random)_owned_ship =", r"\1_controlled_fleet ="], # only playable empire!?
 		r"\s+(?:any|every|random)_(?:system|planet) = \{(?:\s+limit = \{)?\s+has_owner = yes\s+is_owned_by": [r"(any|every|random)_(system|planet) =", r"\1_\2_within_border ="],
-		r"\b(NO[RT] = \{\s*(has_trait = trait_(?:zombie|nerve_stapled)\s+){2}\}|(NOT = \{\s*has_trait = trait_(?:zombie|nerve_stapled)\s+\}){2})": "can_think = no",
-		r"(\bOR = \{\s*(has_trait = trait_(?:zombie|nerve_stapled)\s+){2}\})": "can_think = yes",
+		r"\b(NO[RT] = \{\s*(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}\s*\}": (no_trigger_folder, "can_think = yes"),
+		r"\b(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}": (no_trigger_folder, "can_think = no"),
 		r"(\bOR = \{\s*(species_portrait = human(?:_legacy)?\s+){2}\})": "is_human_species = yes",
 		r"\bNO[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}": [r"NO[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = no"],
 		r"\bOR = \{\s*has_modifier = doomsday_\d[\w\s=]+\}": [r"OR = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = yes"],
@@ -877,7 +879,7 @@ v3_1 = {
 if code_cosmetic and not only_warning:
 	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:corporate_)?crafters\s+?){2}'] = (no_trigger_folder, 'is_crafter_empire = yes')
 	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:pleasure_seekers|corporate_hedonism)\s+?){2}'] = (no_trigger_folder, 'is_pleasure_seeker = yes')
-	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing\s+?){3:4}'] = (no_trigger_folder, 'is_catalytic_empire = yes')
+	v3_1["targets4"][r'(?:has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing\s+?){3,4}'] = (no_trigger_folder, 'is_catalytic_empire = yes')
 
 # 3.0 removed ai_weight for buildings except branch_office_building = yes
 v3_0 = {
@@ -1221,6 +1223,8 @@ if code_cosmetic and not only_warning:
 	targets4[r"\b(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(?:%s)|has_ethic = ethic_fanatic_(?:%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics)] = [r"(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(%s)|has_ethic = ethic_fanatic_(%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics), r"is_fallen_empire_\1\2 = yes"] 
 
 	targets4[r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")'] = [r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', lambda p: "has_synthetic_dawn_"+("not" if (not p.group(2) and p.group(1) == "not") or (not p.group(1) and p.group(2) == "not") else "and")+"_machine_age = yes"]
+	targets4[r'\n\w+_event = \{\n	#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
+
 
 	# is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes TODO
 		# is_robot_pop = no
@@ -1245,7 +1249,7 @@ if mergerofrules:
 	targets4[r"\bNO[RT] = \{\s*(?:merg_is_(?:default|fallen)_empire = yes\s+){2}\}"] = "is_default_or_fallen = no"
 	targets4[r"\bOR = \{\s*(?:merg_is_(?:default|fallen)_empire = yes\s+){2}\}"] = "is_default_or_fallen = yes"
 	targets4[r'\b(?:is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\s*?){5}'] = (no_trigger_folder, "is_endgame_crisis = yes")
-	targets4[r'\b(?:(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\s*?){2:3}'] = (no_trigger_folder, "is_endgame_crisis = yes")
+	targets4[r'\b(?:(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\s*?){2,3}'] = (no_trigger_folder, "is_endgame_crisis = yes")
 
 	if not keep_default_country_trigger:
 		targets3[r"\bis_country_type = default\b"] = (no_trigger_folder, "merg_is_default_empire = yes")
