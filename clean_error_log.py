@@ -33,19 +33,12 @@ text_to_remove_list = [
 ]
 # very specific one-liner
 text_first_remove_list = [
-    "zz_ascension_perks_override.txt", # Giga
-    "adds_4_asteroid_artillery_points", # Giga
-    "category_good_trading_research_speed_mult", # E&CC    
-    "unique_ascension_perks_modifiers.txt line: 553", # E&CC    
-    "planet_districts_farming_cost_mult", # E&CC    
-    "planet_districts_mining_cost_mult", # E&CC    
-    "unique_ascension_perks_menu_events.txt line: 228",
-    "flag_necron_5.dds",
-    "casus_belli_cb_lgate_danger",
-    "LCLUSTER_PROJECT_OVERWRITE",
-    "Missing localization key []", # UAP
-    "for custom tooltip at  file:", # UAP
-    "invalid modifier \"eye_of_terror_influence", # Shroud
+    # "zz_ascension_perks_override.txt", # Giga
+    # "adds_4_asteroid_artillery_points", # Giga
+    # "category_good_trading_research_speed_mult", # E&CC    
+    # "unique_ascension_perks_modifiers.txt line: 553", # E&CC    
+    # "planet_districts_farming_cost_mult", # E&CC    
+    # "planet_districts_mining_cost_mult", # E&CC    
 ]
 
 

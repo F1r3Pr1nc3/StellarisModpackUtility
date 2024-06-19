@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/06/18
+# @revision: 2024/06/19
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -26,10 +26,10 @@ stellaris_version = '3.12.5' # @last supported version
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0 # without writing file=log_file
-mergerofrules = 0 # TODO auto detect?
+mergerofrules = 1 # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0 # TODO
 
@@ -648,7 +648,7 @@ v3_4 = {
 		# r"\s+every_owned_fleet = \{\s+limit\b": [r"owned_fleet", r"controlled_fleet"], # only playable empire and not with is_ship_size!?
 		# r"\s+(?:any|every|random)_owned_ship = \{": [r"(any|every|random)_owned_ship =", r"\1_controlled_fleet ="], # only playable empire!?
 		r"\s+(?:any|every|random)_(?:system|planet) = \{(?:\s+limit = \{)?\s+has_owner = yes\s+is_owned_by": [r"(any|every|random)_(system|planet) =", r"\1_\2_within_border ="],
-		r"\b(NO[RT] = \{\s*(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}\s*\}": (no_trigger_folder, "can_think = yes"),
+		r"\b(NO[RT] = \{\s*(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}\s*\})": (no_trigger_folder, "can_think = yes"),
 		r"\b(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}": (no_trigger_folder, "can_think = no"),
 		r"(\bOR = \{\s*(species_portrait = human(?:_legacy)?\s+){2}\})": "is_human_species = yes",
 		r"\bNO[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}": [r"NO[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = no"],
