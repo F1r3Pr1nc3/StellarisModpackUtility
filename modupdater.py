@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/06/19
+# @revision: 2024/06/25
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -26,10 +26,10 @@ stellaris_version = '3.12.5' # @last supported version
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 1
+code_cosmetic = 0
 also_old = 0
 debug_mode = 0 # without writing file=log_file
-mergerofrules = 1 # TODO auto detect?
+mergerofrules = 0 # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0 # TODO
 
@@ -649,7 +649,7 @@ v3_4 = {
 		# r"\s+(?:any|every|random)_owned_ship = \{": [r"(any|every|random)_owned_ship =", r"\1_controlled_fleet ="], # only playable empire!?
 		r"\s+(?:any|every|random)_(?:system|planet) = \{(?:\s+limit = \{)?\s+has_owner = yes\s+is_owned_by": [r"(any|every|random)_(system|planet) =", r"\1_\2_within_border ="],
 		r"\b(NO[RT] = \{\s*(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}\s*\})": (no_trigger_folder, "can_think = yes"),
-		r"\b(has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}": (no_trigger_folder, "can_think = no"),
+		r"\b(?:has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)\s+){2,4}": [r"(?:has_trait = trait_(?:zombie|nerve_stapled|robot_suppressed|syncretic_proles)(\s+)){2,4}",  (no_trigger_folder, r"can_think = no\1")],
 		r"(\bOR = \{\s*(species_portrait = human(?:_legacy)?\s+){2}\})": "is_human_species = yes",
 		r"\bNO[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}": [r"NO[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = no"],
 		r"\bOR = \{\s*has_modifier = doomsday_\d[\w\s=]+\}": [r"OR = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = yes"],
@@ -1224,6 +1224,7 @@ if code_cosmetic and not only_warning:
 
 	targets4[r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")'] = [r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', lambda p: "has_synthetic_dawn_"+("not" if (not p.group(2) and p.group(1) == "not") or (not p.group(1) and p.group(2) == "not") else "and")+"_machine_age = yes"]
 	targets4[r'\n\w+_event = \{\n	#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
+	targets4[r'\s+?NOT = \{\s+any_\w+ = {[^#]+?\}\s+\}'] = [r'^(\s*?)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+?)\}(?:\1|\s)\}', r"\1count\5\2limit = {\6}\2count = 0\3\4}"]
 
 
 	# is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes TODO
@@ -1615,20 +1616,21 @@ def modfix(file_list):
 		with open(_file, 'r', encoding='utf-8', errors='ignore') as descriptor_mod:
 			# out = descriptor_mod.readlines()
 			out = descriptor_mod.read()
-			pattern = re.compile(r'supported_version=\"(.*?)\"')
+			pattern = re.compile(r'supported_version=\"v?(.*?)\"')
 			m = re.search(pattern, out)
 			if m: m = m.group(1)
 			version_len = stellaris_version.rfind(".")
 			print(r'\nMain Version = %s (version_len = %s)' % (stellaris_version[0:version_len], version_len), file=log_file)
 			print(r'\nMain Version = %s (version_len = %s)' % (stellaris_version[0:version_len], version_len), file=sys.stdout)
 			if debug_mode: print(m, isinstance(m, str), len(m))
-			if isinstance(m, str) and m != stellaris_version and m[0:version_len] != stellaris_version[0:version_len]:
-				if re.search(r"\*", m):
-					out = re.sub(pattern, r'supported_version="%s"' % (stellaris_version[0:version_len + 1] + '*'), out)
-				else:
-					out = re.sub(pattern, r'supported_version="%s"' % stellaris_version, out)
-				if debug_mode: print(type(out), out.encode('utf-8', errors='replace'), m[0:version_len], stellaris_version[0:version_len])
-				pattern = re.compile(r'version=\"(.*?)\"\n')
+			if isinstance(m, str) and m != stellaris_version:
+				if m[0:version_len] != stellaris_version[0:version_len]:
+					if re.search(r"\*", m):
+						out = re.sub(pattern, r'supported_version=\"v?%s"' % (stellaris_version[0:version_len + 1] + '*'), out)
+					else:
+						out = re.sub(pattern, r'supported_version=\"v?%s"' % stellaris_version, out)
+					if debug_mode: print(type(out), out.encode('utf-8', errors='replace'), m[0:version_len], stellaris_version[0:version_len])
+				pattern = re.compile(r'version=\"v?(.*?)\"\n')
 				m = re.search(pattern, out)
 				if m: m = m.group(1)
 				if len(stellaris_version) <= len(m) and re.search(r"\.\d+", m[version_len:len(stellaris_version)]):
@@ -1640,6 +1642,10 @@ def modfix(file_list):
 				if pattern: pattern = pattern.group(1)
 				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version), file=log_file)
 				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version), file=sys.stdout)
+				# Since 3.12 there is a "v" prefix for version
+				# stellaris_version = re.compile(r'supported_version=\"v')
+				if not re.search('supported_version="v', out):
+					out = out.replace('supported_version="', 'supported_version="v')
 				open(_file, 'w', encoding='utf-8', errors='ignore').write(out)
 
 	print("\nDone!", mod_outpath.encode(errors='replace'), file=log_file)
