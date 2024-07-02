@@ -395,7 +395,7 @@ v3_10 = {
 		r'add_modifier = \{ modifier = space_storm \}': 'create_space_storm = yes',
 		r'\bassist_research_mult = ([-\d.]+)\b': lambda p: 'planet_researchers_produces_mult = ' + str(round(int(p.group(1))*0.4, 2)),
 		r'remove_modifier = space_storm': 'destroy_space_storm = yes',
-		r'(\s)num_pops\b': (["common/buildings", "common/decisions", "common/colony_types"], r'\1num_sapient_pops'), # WARNING: only on planet country (num_pops also pop_faction sector)
+		# r'(\s)num_pops\b': (["common/buildings", "common/decisions", "common/colony_types"], r'\1num_sapient_pops'), # WARNING: only on planet country (num_pops also pop_faction sector)
 		r'^(\s*)(valid_for_all_(?:ethics|origins)\b.*)': ("common/traits", r'\1# \2 removed in v3.10'),
 		r"\sleader_class\s*=\s*\{\s*((?:(?:admiral|general|governor|scientist)\s+){1,4})": (["common/traits", "common/governments/councilors"],
 			lambda p: p.group(0) if not p.group(1) else "	leader_class = { " + re.sub(r'(admiral|general|governor)', lambda p2: p2.group(0) if not p2.group(1) else {"governor": "official", "admiral": "commander", "general": "commander" }[p2.group(1)], p.group(1), flags=re.M|re.A)),
@@ -404,20 +404,10 @@ v3_10 = {
 	"targets4": {
 		r'\bleader_class\s*=\s*"?commander"?\s+leader_class\s*=\s*"?commander"?\b': "leader_class = commander",
 		# r"^\s+leader_class = \{\s*((?:admiral|scientist|general|governor)\s+){1,4}": [r'(admiral|general|governor)', (["common/traits", "common/governments/councilors"], lambda p: {"governor": "official", "admiral": "commander", "general": "commander" }[p.group(1)])],
-		r"OR\s*=\s*\{\s*(?:has_modifier\s*=\s*(?:toxic_|frozen_)?terraforming_candidate\s+){2,3}\}": "is_terraforming_candidate = yes",
+		r"(?:\s+has_modifier\s*=\s*(?:toxic_|frozen_)?terraforming_candidate){2,3}\s*": " is_terraforming_candidate = yes ",
 	}
 }
 
-v3_10_rev = { # BETA ONLY
-	"targetsR": [
-	],
-	"targets3": {
-		r'\bleader_lifespan_add = ': 'leader_age = ',
-		r'\bis_terraforming_candidate = yes': 'OR = { has_modifier = terraforming_candidate has_modifier = frozen_terraforming_candidate has_modifier = toxic_terraforming_candidate }',
-	},
-	"targets4": {
-	}
-}
 v3_9 = {
 	"targetsR": [
 		[r"^[^#]+?\sland_army\s", "Removed army parameter from v.3.8 in v.3.9:"], # only from 3.8
@@ -633,8 +623,6 @@ v3_4 = {
 		r"\bbranch_office_building = yes": ("common/buildings", r"owner_type = corporate"),
 		r"\bconstruction_blocks_others = yes": ("common/megastructures", 'construction_blocks_and_blocked_by = multi_stage_type'),
 		r"\bhas_species_flag = racket_species_flag":  r"exists = event_target:racket_species is_same_species = event_target:racket_species",
-		# code opts/cosmetic only
-		re.compile(r"\bNOT = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}", re.I): r"\1 \2 = no }",
 	},
 	"targets4": {
 		# >= 3.4
@@ -920,10 +908,6 @@ v3_0 = {
 		r"((?:controller|(?:space_)?owner|overlord|country) = \{|is_ai = (?:yes|no))\s+is_same_value\b": r"\1 is_same_empire",
 		# r"exists = (?:solar_system|planet)\.(?:space_)?owner( |$)": r"has_owner = yes\1", TODO not sure
 		# code opts/cosmetic only
-		r"\bNO[RT] = \{\s*([^\s]+) = yes\s*\}": r"\1 = no",
-		r"\bany_system_planet = \{\s*is_capital = (yes|no)\s*\}": r"is_capital_system = \1",
-		r"(\s+has_(?:population|migration)_control) = (yes|no)": r"\1 = { type = \2 country = prev.owner }", # NOT SURE
-		re.compile(r"\bNOT = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}", re.I): r"\1 \2 = no }",
 		## Since Megacorp removed: change_species_characteristics was false documented until 3.2
 		r"[\s#]+(pops_can_(be_colonizers|migrate|reproduce|join_factions|be_slaves)|can_generate_leaders|pops_have_happiness|pops_auto_growth|pop_maintenance) = (yes|no)\s*": "",
 	},
@@ -1051,8 +1035,6 @@ else:
 		actuallyTargets["targetsR"].extend(v3_9["targetsR"])
 		actuallyTargets["targets3"].update(v3_9["targets3"])
 		actuallyTargets["targets4"].update(v3_9["targets4"])
-		if only_upto_version == 3.9:
-			actuallyTargets["targets3"].update(v3_10_rev["targets3"])
 	if only_upto_version >= 3.8:
 		actuallyTargets["targetsR"].extend(v3_8["targetsR"])
 		actuallyTargets["targets3"].update(v3_8["targets3"])
@@ -1165,6 +1147,10 @@ elif not mergerofrules:
 
 if code_cosmetic and not only_warning:
 	triggerScopes = r"limit|trigger|any_\w+|leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+"
+	targets4[r"\bNO[RT] = \{\s*\w+? = yes\s*\}"] = [r"NO[RT] = \{\s*(\w+? = )yes\s*\}", r"\1no"] 
+	targets4[r"\bany_system_planet = \{\s*is_capital = (?:yes|no)\s*\}"] = [r"any_system_planet = \{\s*is_capital = (yes|no)\s*\}", r"is_capital_system = \1"]
+	targets3[r"(\s+has_(?:population|migration)_control) = (yes|no)"] = r"\1 = { type = \2 country = prev.owner }" # NOT SURE
+	targets3[re.compile(r"\bNO[RT] = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}", re.I)] = r"\1 \2 = no }"
 	targets3[r"((?:[<=>]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+)\b"] = lambda p: p.group(1).lower()
 	targets3[r"\b(IF|ELSE|ELSE_IF|OWNER|Owner|CONTROLLER|Controller|LIMIT) ="] = lambda p: p.group(1).lower() + " ="
 	targets3[r"\b(or|not|nor|and) ="] = lambda p: p.group(1).upper() + " ="
@@ -1223,7 +1209,7 @@ if code_cosmetic and not only_warning:
 	targets4[r"\b(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(?:%s)|has_ethic = ethic_fanatic_(?:%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics)] = [r"(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(%s)|has_ethic = ethic_fanatic_(%s)\s+is_fallen_empire = yes)" % (vanilla_ethics, vanilla_ethics), r"is_fallen_empire_\1\2 = yes"] 
 
 	targets4[r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")'] = [r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', lambda p: "has_synthetic_dawn_"+("not" if (not p.group(2) and p.group(1) == "not") or (not p.group(1) and p.group(2) == "not") else "and")+"_machine_age = yes"]
-	targets4[r'\n\w+_event = \{\n	#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
+	targets4[r'\n\w+_event = \{\n\s*#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
 	targets4[r'\n\s+NOT = \{\s+any_\w+ = {[^#]+?\}\s*?\}\n'] = [r'^(\s*?)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}\n', r"\1count\5\2limit = {\6}\2count = 0\3\4}\n"]
 	# NAND <=> OR = { NOT
 	# targets4[r"\s+OR = \{\s*(?:(?:NOT = \{[^{}#]+?|\w+ = \{[^{}#]+? = no)\s+?\}\s+?){2}\s*\}\n"] = [r"OR = \{(\s*)(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}\s+(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}", lambda p: "NAND = {"+p.group(1)+(p.group(2) if isinstance(p.group(2), str) and p.group(2) != "" else p.group(3)+"yes }")+p.group(1)+(p.group(4) if isinstance(p.group(4), str) and p.group(4) != "" else p.group(5)+"yes }")]
