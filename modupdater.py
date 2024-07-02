@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/06/25
+# @revision: 2024/07/02
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -1224,8 +1224,10 @@ if code_cosmetic and not only_warning:
 
 	targets4[r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")'] = [r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', lambda p: "has_synthetic_dawn_"+("not" if (not p.group(2) and p.group(1) == "not") or (not p.group(1) and p.group(2) == "not") else "and")+"_machine_age = yes"]
 	targets4[r'\n\w+_event = \{\n	#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
-	targets4[r'\s+?NOT = \{\s+any_\w+ = {[^#]+?\}\s+\}'] = [r'^(\s*?)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+?)\}(?:\1|\s)\}', r"\1count\5\2limit = {\6}\2count = 0\3\4}"]
-
+	targets4[r'\n\s+NOT = \{\s+any_\w+ = {[^#]+?\}\s*?\}\n'] = [r'^(\s*?)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}\n', r"\1count\5\2limit = {\6}\2count = 0\3\4}\n"]
+	# NAND <=> OR = { NOT
+	# targets4[r"\s+OR = \{\s*(?:(?:NOT = \{[^{}#]+?|\w+ = \{[^{}#]+? = no)\s+?\}\s+?){2}\s*\}\n"] = [r"OR = \{(\s*)(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}\s+(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}", lambda p: "NAND = {"+p.group(1)+(p.group(2) if isinstance(p.group(2), str) and p.group(2) != "" else p.group(3)+"yes }")+p.group(1)+(p.group(4) if isinstance(p.group(4), str) and p.group(4) != "" else p.group(5)+"yes }")]
+	targets4[r"((\s+)OR = \{(?:(?:\s+NOT = \{[^\n#]+?\s+?\}|\s+(\w+ = \{)?[^\n#]+? = no(?(3)\s*?\}))){2}\2\})"] = [r"OR = \{(\s*)(?:NOT = \{\s*((\w+ = \{)?[^{}#]+?(?(3)\s+?\}))\s+?\}|((\w+ = \{)?[^{}#]+? = )no)(?(5)\s+?\})\s+(?:NOT = \{\s*((\w+ = \{)?[^{}#]+?(?(7)\s+?\}))\s+?\}|((\w+ = \{)?[^{}#]+? = )no)(?(9)\s+?\})", lambda p: "NAND = {" + p.group(1) + (p.group(2) if p.group(2) and p.group(2) != "" else p.group(4)+"yes" + (" }" if p.group(5) and p.group(5) != "" else ""))+p.group(1)+(p.group(6) if p.group(6) and p.group(6) != "" else p.group(8)+"yes" + (" }" if p.group(9) and p.group(9) != "" else ""))] # NAND = {\1\2\4yes\1\6\8yes
 
 	# is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes TODO
 		# is_robot_pop = no
@@ -1616,7 +1618,7 @@ def modfix(file_list):
 		with open(_file, 'r', encoding='utf-8', errors='ignore') as descriptor_mod:
 			# out = descriptor_mod.readlines()
 			out = descriptor_mod.read()
-			pattern = re.compile(r'supported_version=\"v?(.*?)\"')
+			pattern = r'supported_version="v?(.*?)"'
 			m = re.search(pattern, out)
 			if m: m = m.group(1)
 			version_len = stellaris_version.rfind(".")
@@ -1626,18 +1628,20 @@ def modfix(file_list):
 			if isinstance(m, str) and m != stellaris_version:
 				if m[0:version_len] != stellaris_version[0:version_len]:
 					if re.search(r"\*", m):
-						out = re.sub(pattern, r'supported_version=\"v?%s"' % (stellaris_version[0:version_len + 1] + '*'), out)
+						out = re.sub(pattern, r'supported_version="v%s"' % (stellaris_version[0:version_len + 1] + '*'), out)
 					else:
-						out = re.sub(pattern, r'supported_version=\"v?%s"' % stellaris_version, out)
+						out = re.sub(pattern, r'supported_version="v%s"' % stellaris_version, out)
 					if debug_mode: print(type(out), out.encode('utf-8', errors='replace'), m[0:version_len], stellaris_version[0:version_len])
-				pattern = re.compile(r'version=\"v?(.*?)\"\n')
+				pattern = r'version="v?(.*?)"\n'
 				m = re.search(pattern, out)
-				if m: m = m.group(1)
-				if len(stellaris_version) <= len(m) and re.search(r"\.\d+", m[version_len:len(stellaris_version)]):
-					out = out.replace(m[0:len(stellaris_version)], stellaris_version)
-				else:
-					out = out.replace(m, stellaris_version + '.0')
-				pattern = re.compile(r'name=\"(.*?)\"\n')
+				if m:
+					m = m.group(1)
+					if len(stellaris_version) <= len(m) and re.search(r"\.\d+", m[version_len:len(stellaris_version)]) and m[0:len(stellaris_version)] != stellaris_version:
+						print(m, stellaris_version, len(stellaris_version))
+						out = out.replace(m, stellaris_version + '.0')
+						out = out.replace(m[0:len(stellaris_version)], stellaris_version)
+						out = out.replace(m[0:version_len + 1], stellaris_version[0:version_len + 1])
+				pattern = re.compile(r'name="(.*?)"\n')
 				pattern = re.search(pattern, out)
 				if pattern: pattern = pattern.group(1)
 				print(pattern.encode(errors='replace'), "version %s on 'descriptor.mod' updated to %s!" % (m, stellaris_version), file=log_file)
