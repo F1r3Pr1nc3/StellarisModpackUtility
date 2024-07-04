@@ -1,7 +1,7 @@
 # @author: FirePrince
 only_upto_version = "3.12" #  Should be number string
 
-# @revision: 2024/07/02
+# @revision: 2024/07/04
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -26,7 +26,7 @@ stellaris_version = '3.12.5' # @last supported version
 mod_path = ''
 only_warning = 0
 only_actual = 0 # TODO Deprecate value - replaced by var only_from_version !?
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0 # without writing file=log_file
 mergerofrules = 0 # TODO auto detect?
@@ -246,8 +246,8 @@ no_trigger_folder = re.compile(r"^([^_]+)(_(?!trigger)[^/_]+|[^_]*$)(?(2)/([^_]+
 
 actuallyTargets = {
 	"targetsR": [], # Removed syntax # This are only warnings, commands which cannot be easily replaced.
-	"targets3": {}, # Simple syntax
-	"targets4": {}  # Multiline syntax
+	"targets3": {}, # Simple syntax (only one-liner)
+	"targets4": {}  # Multiline syntax # key (pre match without group or one group): arr (search, replace) or str (if no group or one group) # re flags=re.I|re.M|re.A  
 }
 
 """== 3.12 Quick stats ==
@@ -259,12 +259,13 @@ lastversion = v3_12 = {
 	"targetsR": [
 		[r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b", "Removed in v.3.12, added in v.3.6"],
 		[r"^\s+[^#]*?\bstations_produces_mult\b", "Removed in v.3.12,"],
-		[r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v.3.12,"],
+		# [r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v.3.12,"],
 		[r"^\s+[^#]*?\bactivate_crisis_progression = yes\b", "Since v.3.12 needs a crisis path"],
 		(['common/technology'], [r"^\s+[^#]*?\bresearch_leader\b","Leads to CTD in v.3.12.3! Obsolete since v.3.8"]),
 	],
 	"targets3": {
 		r'\bset_gestalt_node_protrait_effect\b': 'set_gestalt_node_portrait_effect',
+		r"(\w+modifier = )crucible_colony\b": r'\1gestation_colony',
 		r'\bhas_synthethic_dawn = yes': 'host_has_dlc = "Synthetic Dawn Story Pack"',  # 'has_synthetic_dawn', enable it later for backward compat.
 		r'\bhas_origin = origin_post_apocalyptic\b': (no_trigger_folder, 'is_apocalyptic_empire = yes'),
 		r'\bhas_origin = origin_subterranean\b': (no_trigger_folder, 'is_subterranean_empire = yes'),
@@ -907,7 +908,6 @@ v3_0 = {
 		r"(\s+)is_(?:country|same_value) = ([\w\._:]+\.(?:controller|(?:space_)?owner)(?:\.overlord)?(?:[\s}]+|$))": r"\1is_same_empire = \2",
 		r"((?:controller|(?:space_)?owner|overlord|country) = \{|is_ai = (?:yes|no))\s+is_same_value\b": r"\1 is_same_empire",
 		# r"exists = (?:solar_system|planet)\.(?:space_)?owner( |$)": r"has_owner = yes\1", TODO not sure
-		# code opts/cosmetic only
 		## Since Megacorp removed: change_species_characteristics was false documented until 3.2
 		r"[\s#]+(pops_can_(be_colonizers|migrate|reproduce|join_factions|be_slaves)|can_generate_leaders|pops_have_happiness|pops_auto_growth|pop_maintenance) = (yes|no)\s*": "",
 	},
@@ -945,7 +945,6 @@ else:
 		#     r"MACHINE_species_trait_points_add = \d" : ["MACHINE_species_trait_points_add ="," ROBOT_species_trait_points_add = ",""],
 		#     r"job_replicator_add = \d":["if = {limit = {has_authority = \"?auth_machine_intelligence\"?} job_replicator_add = ", "} if = {limit = {has_country_flag = synthetic_empire} job_roboticist_add = ","}"]
 		# }
-		### (only one-liner)
 		"targets3": {
 			r"\bstatic_rotation = yes\s": ("common/component_templates", ""),
 			r"\bowner\.species\b": "owner_species",
@@ -957,8 +956,6 @@ else:
 			r"\b(any|every|random)_(research|mining)_station\b": r"\2_station",
 			r"(\s+)add_(%s) = (-?@\w+|-?\d+)" % resource_items: r"\1add_resource = { \2 = \3 }",
 		},
-		# re flags=re.I|re.M|re.A (multiline)
-		# key (pre match without group or one group): arr (search, replace) or str (if no group or one group)
 		"targets4":  {
 			### < 3.0
 			r"\s+every_planet_army = \{\s*remove_army = yes\s*\}": [r"every_planet_army = \{\s*remove_army = yes\s*\}", r"remove_all_armies = yes"],
@@ -1147,10 +1144,6 @@ elif not mergerofrules:
 
 if code_cosmetic and not only_warning:
 	triggerScopes = r"limit|trigger|any_\w+|leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+"
-	targets4[r"\bNO[RT] = \{\s*\w+? = yes\s*\}"] = [r"NO[RT] = \{\s*(\w+? = )yes\s*\}", r"\1no"] 
-	targets4[r"\bany_system_planet = \{\s*is_capital = (?:yes|no)\s*\}"] = [r"any_system_planet = \{\s*is_capital = (yes|no)\s*\}", r"is_capital_system = \1"]
-	targets3[r"(\s+has_(?:population|migration)_control) = (yes|no)"] = r"\1 = { type = \2 country = prev.owner }" # NOT SURE
-	targets3[re.compile(r"\bNO[RT] = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}", re.I)] = r"\1 \2 = no }"
 	targets3[r"((?:[<=>]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+)\b"] = lambda p: p.group(1).lower()
 	targets3[r"\b(IF|ELSE|ELSE_IF|OWNER|Owner|CONTROLLER|Controller|LIMIT) ="] = lambda p: p.group(1).lower() + " ="
 	targets3[r"\b(or|not|nor|and) ="] = lambda p: p.group(1).upper() + " ="
@@ -1188,6 +1181,10 @@ if code_cosmetic and not only_warning:
 	targets3[r"\bfleet = \{\s*(destroy|delete)_fleet = this\s*\}"] = r"\1_fleet = fleet" # TODO may extend
 	targets3[r"(species|country|ship|pop|leader|army)\s*=\s*\{\s*is_same_value\s*=\s*([\w\._:]+?\.?species(?:[\s}]+|$))"] = r"\1 = { is_same_species = \2"
 	targets3[r'\s+change_all\s*=\s*no'] = '' # only yes option
+	targets3[r"(\s+has_(?:population|migration)_control) = (yes|no)"] = r"\1 = { type = \2 country = prev.owner }" # NOT SURE
+	targets3[re.compile(r"\bNO[RT] = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}", re.I)] = r"\1 \2 = no }"
+	targets4[r"\bNO[RT] = \{\s*\w+? = yes\s*\}"] = [r"NO[RT] = \{\s*(\w+? = )yes\s*\}", r"\1no"] 
+	targets4[r"\bany_system_planet = \{\s*is_capital = (?:yes|no)\s*\}"] = [r"any_system_planet = \{\s*is_capital = (yes|no)\s*\}", r"is_capital_system = \1"]
 
 	## targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \1" # remove comment punctuation mark
 	targets4[r"\n{3,}"] = "\n\n" # r"\s*\n{2,}": "\n\n", # cosmetic remove surplus lines
@@ -1200,7 +1197,7 @@ if code_cosmetic and not only_warning:
 	targets4[r"\n\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}"] = [r"random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}","event_target:global_event_country = {"]
 	 # unnecessary AND
 	targets4[r"\b((?:%s) = \{(\s+)(?:AND|this) = \{(?:\2\t[^\n]+)+\2\}\n)" % triggerScopes] = [r"(%s) = \{\n(\s+)(?:AND|this) = \{\n\t(\2[^\n]+\n)(?(3)\t)(\2[^\n]+\n)?(?(4)\t)(\2[^\n]+\n)?(?(5)\t)(\2[^\n]+\n)?(?(6)\t)(\2[^\n]+\n)?(?(7)\t)(\2[^\n]+\n)?(?(8)\t)(\2[^\n]+\n)?(?(9)\t)(\2[^\n]+\n)?(?(10)\t)(\2[^\n]+\n)?(?(11)\t)(\2[^\n]+\n)?(?(12)\t)(\2[^\n]+\n)?(?(13)\t)(\2[^\n]+\n)?(?(14)\t)(\2[^\n]+\n)?(?(15)\t)(\2[^\n]+\n)?(?(16)\t)(\2[^\n]+\n)?(?(17)\t)(\2[^\n]+\n)?(?(18)\t)(\2[^\n]+\n)?(?(19)\t)(\2[^\n]+\n)?(?(20)\t)(\2[^\n]+\n)?\2\}\n" % triggerScopes, r"\1 = {\n\3\4\5\6\7\8\9\10\11\12\13\14\15\16\17\18\19\20\21"]
-	targets4[r"(?:\s+add_resource = \{\s*\w+ = [^{}#]+\s*\})+"] = [r"(\s+add_resource = \{)(\s*\w+ = [^\s{}#]+)\s*\}\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\}(?(3)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(4)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(5)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(6)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(7)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?", r"\1\2\3\4\5\6\7 }"] # 6 items
+	targets4[r"(?:\s+add_resource = \{\s*\w+ = [^\s{}#]+\s*\}){2,}"] = [r"(\s+add_resource = \{)(\s*\w+ = [^\s{}#]+)\s*\}\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\}(?(3)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(4)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(5)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(6)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?(?(7)\s+add_resource = \{(\s*\w+ = [^\s{}#]+)\s*\})?", r"\1\2\3\4\5\6\7 }"] # 6 items
 	### 3.4
 	targets4[r"\bN?O[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [r"(N)?O[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}", lambda p: "is_doomsday_planet = "+("yes" if not p.group(1) or p.group(1) == "" else "no")]
 	# targets4[r"\bOR = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [r"OR = \{\s*(has_modifier = doomsday_\d\s+){5}\}", "is_doomsday_planet = yes"]
@@ -1210,7 +1207,8 @@ if code_cosmetic and not only_warning:
 
 	targets4[r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")'] = [r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', lambda p: "has_synthetic_dawn_"+("not" if (not p.group(2) and p.group(1) == "not") or (not p.group(1) and p.group(2) == "not") else "and")+"_machine_age = yes"]
 	targets4[r'\n\w+_event = \{\n\s*#[^\n]+'] = [r'(\n\w+_event = \{)\n	(#[^\n]+)', ("events", r"\n\2\1")]
-	targets4[r'\n\s+NOT = \{\s+any_\w+ = {[^#]+?\}\s*?\}\n'] = [r'^(\s*?)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}\n', r"\1count\5\2limit = {\6}\2count = 0\3\4}\n"]
+	targets3[r'\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}'] = r"count\1 limit = {\2} count = 0 }"
+	targets4[r'(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n'] = [r'^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}', r"\1count\5\2limit = {\6}\2count = 0\3\4}"]
 	# NAND <=> OR = { NOT
 	# targets4[r"\s+OR = \{\s*(?:(?:NOT = \{[^{}#]+?|\w+ = \{[^{}#]+? = no)\s+?\}\s+?){2}\s*\}\n"] = [r"OR = \{(\s*)(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}\s+(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}", lambda p: "NAND = {"+p.group(1)+(p.group(2) if isinstance(p.group(2), str) and p.group(2) != "" else p.group(3)+"yes }")+p.group(1)+(p.group(4) if isinstance(p.group(4), str) and p.group(4) != "" else p.group(5)+"yes }")]
 	targets4[r"((\s+)OR = \{(?:(?:\s+NOT = \{[^\n#]+?\s+?\}|\s+(\w+ = \{)?[^\n#]+? = no(?(3)\s*?\}))){2}\2\})"] = [r"OR = \{(\s*)(?:NOT = \{\s*((\w+ = \{)?[^{}#]+?(?(3)\s+?\}))\s+?\}|((\w+ = \{)?[^{}#]+? = )no)(?(5)\s+?\})\s+(?:NOT = \{\s*((\w+ = \{)?[^{}#]+?(?(7)\s+?\}))\s+?\}|((\w+ = \{)?[^{}#]+? = )no)(?(9)\s+?\})", lambda p: "NAND = {" + p.group(1) + (p.group(2) if p.group(2) and p.group(2) != "" else p.group(4)+"yes" + (" }" if p.group(5) and p.group(5) != "" else ""))+p.group(1)+(p.group(6) if p.group(6) and p.group(6) != "" else p.group(8)+"yes" + (" }" if p.group(9) and p.group(9) != "" else ""))] # NAND = {\1\2\4yes\1\6\8yes
@@ -1557,7 +1555,7 @@ def modfix(file_list):
 								if isinstance(repl, list):
 									if isinstance(tar, tuple):
 										tar = tar[0] # Take only first group
-										# print("ONLY GRP1:", type(replace), replace)
+										if debug_mode: print("ONLY GRP1:", type(replace), replace)
 									replace = re.sub(replace[0], replace[1], tar, flags=re.I|re.M|re.A)
 								if isinstance(repl, str) or (not isinstance(tar, tuple) and tar in out and tar != replace):
 									print("Match:\n", tar, file=log_file)
@@ -1571,7 +1569,7 @@ def modfix(file_list):
 									out = out.replace(tar, replace)
 									changed = True
 								elif debug_mode:
-									print("DEBUG Blind Match:", tar, repl, type(repl), replace)
+									print("DEBUG BLIND MATCH:", tar, repl, type(repl), replace)
 
 				if changed and not only_warning:
 					structure = os.path.normpath(os.path.join(mod_outpath, subfolder))
