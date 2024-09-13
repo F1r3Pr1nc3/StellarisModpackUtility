@@ -24,10 +24,10 @@ stellaris_version = only_upto_version + '.0' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0  # without writing file=log_file
-mergerofrules = 0  # TODO auto detect?
+mergerofrules = 1  # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0  # TODO
 
@@ -362,7 +362,7 @@ v3_11 = {
             r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))",
             r"\1_galcom_member = \2",
         ],
-        r"\b(?:(?:is_planet_class = pc_(?:city|relic)|merg_is_(?:arcology|relic_world) = yes)\s*?){2}": (
+        r"\b(?:(?:is_planet_class = pc_(?:city|relic)\b|merg_is_(?:arcology|relic_world) = yes)\s*?){2}": (
             no_trigger_folder,
             "is_urban_planet = yes",
         ),
@@ -1010,7 +1010,7 @@ v3_2 = {
         [r"\bslot = 0", "v3.2: set_starbase_module = now starts with 1"],
         [r"\bany_pop\b", "use any_owned_pop/any_species_pop"],
         [
-            r"[^# \t]\s+is_planet_class = pc_ringworld_habitable",
+            r"[^# \t]\s+is_planet_class = pc_ringworld_habitable\b",
             'v3.2: could possibly be replaced with "is_ringworld = yes"',
         ],
         # r"\sadd_tech_progress_effect = ", # replaced with add_tech_progress
@@ -1022,7 +1022,7 @@ v3_2 = {
         ),  # scripted trigger
     ],
     "targets3": {
-        # r"\bis_planet_class = pc_ringworld_habitable": "is_ringworld = yes",
+        # r"\bis_planet_class = pc_ringworld_habitable\b": "is_ringworld = yes",
         r"\s+free_guarantee_days = \d+": "",
         r"\badd_tech_progress_effect": "add_tech_progress",
         r"\bgive_scaled_tech_bonus_effect": "add_monthly_resource_mult",
@@ -1969,18 +1969,9 @@ if mergerofrules:
         no_trigger_folder,
         r"merg_is_\1 = yes",
     )
-    targets3[r"\bis_pd_habitat = yes"] = (
-        no_trigger_folder,
-        "merg_is_habitat = yes"
-    )
-    targets3[r"\bis_planet_class = pc_relic"] = (
-        no_trigger_folder,
-        "merg_is_relic_world = yes",
-    )
-    targets3[r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)"] = (
-        no_trigger_folder,
-        "merg_is_machine_world = yes",
-    )
+    targets3[r"\bis_pd_habitat = yes"] = (no_trigger_folder, "merg_is_habitat = yes" )
+    targets3[r"\bis_planet_class = pc_relic\b"] = (no_trigger_folder, "merg_is_relic_world = yes", )
+    targets3[r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)"] = (no_trigger_folder, "merg_is_machine_world = yes", )
     targets3[
         r"\b(is_planet_class = pc_city\b|is_pd_arcology = yes|is_city_planet = yes)"
     ] = (no_trigger_folder, "merg_is_arcology = yes")
