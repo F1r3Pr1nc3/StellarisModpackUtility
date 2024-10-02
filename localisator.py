@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ###    @author FirePrince
-###    @revision 2024/09/12
+###    @revision 2024/10/02
 ###
 ###    USAGE: You need install https://pyyaml.org/wiki/PyYAMLDocumentation for Python3.x
 ###    ATTENTION: You still must customize the mod path at localModPath (and optionally the languages which should be overhauled)
@@ -36,7 +36,7 @@ except:
 # ============== Initialize global variables ===============
 
 optimizeLoc = False  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
-optimizeLocString = "SpecialProject"  # only used if optimizeLoc is True
+optimizeLocString = "lbd"  # only used if optimizeLoc is True
 
 loadVanillaLoc = False  # True BETA: replaces exact matching strings with vanilla ones
 loadVanillaLocUpdateDefault = False  # only usable if loadVanillaLoc
@@ -58,150 +58,37 @@ key_IGNORE = ""  # stops copying over localisations keys with this starting patt
 # localModPath = ["The Storm Cluster", ["simp_chinese", "korean"]]
 # localModPath = ["Starbase_Strong", ["russian", "simp_chinese", "french", "polish", "japanese", "korean"]]
 localModPath = ["prob", []]
-localModPath = [
-    "Ad Astra Technology",
-    [
-        "german",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
 # localModPath = ["E&CC", []]
 # localModPath = ["c:/Games/steamapps/workshop/content/281990/2915166985", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 # localModPath = ["Gray Tempest Shipset", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["CrisisManager_Sleeper", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_MidGame", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_EndGame", ["french", "polish", "japanese", "korean"]]
-localModPath = [
-    "Species Engineering",
-    [
-        "german",
-        "russian",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean", ], ]
 localModPath = ["Enhanced Gene Modding", ["spanish", "braz_por", "polish", "japanese"]]
-localModPath = [
-    "Engineers of Life",
-    ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"],
-]
-localModPath = [
-    "e:/lovelydemons_3.9",
-    [
-        "german",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["Engineers of Life", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"], ]
+localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
 localModPath = ["FATALF", ["english"]]
-localModPath = [
-    "New Job Manager",
-    ["german", "spanish", "braz_por", "french", "polish", "korean"],
-]
-localModPath = [
-    "The Sleeper 3",
-    [
-        "german",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"], ]
+localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
 localModPath = ["TheGreatKhanExpanded", []]
-localModPath = [
-    "c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch",
-    ["german", "french", "polish", "simp_chinese", "japanese", "korean"],
-]
-localModPath = [
-    "distant_stars_overhaul",
-    [
-        "german",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch", ["german", "french", "polish", "simp_chinese", "japanese", "korean"], ]
+localModPath = ["distant_stars_overhaul", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
 localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
 localModPath = ["Daemonic_Incursion", ["english"]]
 localModPath = ["Rise and Fall", ["english"]]
-localModPath = [
-    "Grimdark",
-    [
-        "german",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
-localModPath = [
-    "Freebooter Origin",
-    [
-        "german",
-        "russian",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "japanese",
-        "korean",
-    ],
-]
+localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean", ], ]
 localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
-localModPath = [
-    "UAP_dev",
-    ["german", "spanish", "braz_por", "french", "polish"],
-]  # , "korean" partial
-localModPath = [
-    "Nanite-Expansion",
-    ["german", "spanish", "braz_por", "polish", "japanese", "korean"],
-]
-localModPath = [
-    "Special Project Extended",
-    [
-        "german",
-        "russian",
-        "spanish",
-        "braz_por",
-        "french",
-        "polish",
-        "simp_chinese",
-        "japanese",
-        "korean",
-    ],
-]
-localModPath = [
-    "Shroud Rising",
-    ["german", "spanish", "braz_por", "french", "polish", "korean"],
-]
-localModPath = ["ADeadlyTempest", ["english", "polish", "korean"]]
+localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"], ]
+localModPath = ["Special Project Extended", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
+localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["Destiny", ["english"]]
+localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"]]  # , "korean" partial
+localModPath = ["ADeadlyTempest", ["english", "polish", "korean"]]
+localModPath = ["Loud But Deadly", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
+
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
 # local_OVERHAUL = ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]
@@ -211,19 +98,7 @@ print(localModPath, local_OVERHAUL)
 
 # mods_registry = "mods_registry.json" # old launcher (changed in 2.7.2)
 mods_registry = "settings.txt"
-localizations = [
-    "english",
-    "german",
-    "russian",
-    "spanish",
-    "braz_por",
-    "french",
-    "polish",
-    "simp_chinese",
-    "japanese",
-    "korean",
-]  # , "italian"
-# localizations = ["english", "russian"]
+localizations = ["english", "german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ]  # , "italian"
 
 
 # old, new = string
@@ -361,14 +236,16 @@ if loadVanillaLoc and len(local_OVERHAUL) > 0:
         elif os.name == "nt":
             loadVanillaLoc = ""
             aReg = winreg.HKEY_CURRENT_USER
-            proc_arch = os.environ["PROCESSOR_ARCHITECTURE"].lower()
-            proc_arch64 = os.environ["PROCESSOR_ARCHITEW6432"].lower()
+            proc_arch = os.environ.get("PROCESSOR_ARCHITECTURE", "").lower()
+            proc_arch64 = os.environ.get("PROCESSOR_ARCHITEW6432", "").lower()
             aKey = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
             aReg = winreg.HKEY_LOCAL_MACHINE
             print(r"*** Reading Stellaris path from %s ***" % (aKey))
             if proc_arch == "x86" and not proc_arch64:
-                arch_keys = {0}
-            elif proc_arch == "x86" or proc_arch == "amd64":
+                # 32-bit system
+                arch_keys = {0} 
+            elif proc_arch == "amd64" or proc_arch64:
+                # 64-bit system
                 arch_keys = {winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY}
             else:
                 raise Exception("Unhandled arch: %s" % proc_arch)

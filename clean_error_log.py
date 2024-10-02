@@ -1,4 +1,5 @@
 import os
+import re
 
 logs_path = '' # os.path.dirname(os.getcwd())
 filename = "error.log"
@@ -30,15 +31,13 @@ text_to_remove_list = [
     "Invalid ship size restriction",
     "Invalid argument [trp_",
     "esc_",
+    "localisation for advisor voice",
+    "already exist. id has to be unique",
+    "DMM_NAME, DMM_FLAG",
 ]
 # very specific one-liner
 text_first_remove_list = [
-    # "zz_ascension_perks_override.txt", # Giga
-    # "adds_4_asteroid_artillery_points", # Giga
-    # "category_good_trading_research_speed_mult", # E&CC    
-    # "unique_ascension_perks_modifiers.txt line: 553", # E&CC    
-    # "planet_districts_farming_cost_mult", # E&CC    
-    # "planet_districts_mining_cost_mult", # E&CC    
+    "failed to generate a ship class name for ship size", # ?
 ]
 
 
@@ -66,6 +65,7 @@ def remove_lines_with_first_hit(filename, text_to_remove_list):
         lines[index] = "" # line.replace(text, "", 1)  # Replace only the first occurrence
         break  # Exit inner loop after first removal
 
+
   # Write the filtered lines back to the file
   with open(filename, "w") as f:
     f.writelines(lines)
@@ -79,8 +79,12 @@ def remove_lines_with_text(filename, text_to_remove_list):
   filtered_lines = [
       line for line in lines if all(text not in line for text in text_to_remove_list)
   ]
+
   with open(filename, "w") as f:
-    f.writelines(filtered_lines)
+    # f.writelines(filtered_lines)
+    for line in filtered_lines:
+      # print(line)
+      f.write(re.sub(r'^\[\d\d:\d\d:\d\d\]', '', line))
 
 filename = os.path.join(logs_path, filename) 
 

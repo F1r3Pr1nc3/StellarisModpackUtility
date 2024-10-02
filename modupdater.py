@@ -12,7 +12,7 @@ from tkinter import messagebox
 # @author: FirePrince
 only_upto_version = "3.13"  #  Should be number string
 
-# @revision: 2024/09/13
+# @revision: 2024/10/02
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -20,14 +20,14 @@ only_upto_version = "3.13"  #  Should be number string
 # @TODO: replace in *.YML ?
 # @TODO: extended support The Merger of Rules ?
 
-stellaris_version = only_upto_version + '.0' # @last supported sub-version
+stellaris_version = only_upto_version + '.2' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
-code_cosmetic = 1
+code_cosmetic = 0
 also_old = 0
 debug_mode = 0  # without writing file=log_file
-mergerofrules = 1  # TODO auto detect?
+mergerofrules = 0  # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0  # TODO
 
@@ -484,7 +484,7 @@ v3_10 = {
             "common/traits",
             r"\1# \2 removed in v3.10",
         ),
-        r"\sleader_class\s*=\s*\{\s*((?:(?:admiral|general|governor|scientist)\s+){1,4})": (
+        r"\sleader_class\s*=\s*\{\s*((?:(?:admiral|general|governor|scientist)\s+){2,4})": (
             ["common/traits", "common/governments/councilors"],
             lambda p: (
                 p.group(0)
@@ -1755,11 +1755,7 @@ if code_cosmetic and not only_warning:
     )  # format comment
     targets3[r"#([^\-\s#])"] = r"# \1"  # r"#([^\s#])": r"# \1", # format comment
     #  targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
-    targets3[
-        r"(?<!(?:e\.g|.\.\.))([#.][\t ][a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$"
-    ] = lambda p: p.group(1).upper() + p.group(
-        2
-    )  # format comment
+    targets3[r"(?<!(?:e\.g|.\.\.))([#.][\t ][a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: p.group(1).upper() + p.group(2 )  # format comment
     # NOT NUM triggers. TODO <> ?
     targets3[r"\bNOT = \{\s*(num_\w+|\w+?(?:_passed)) = (\d+)\s*\}"] = r"\1 != \2"
     targets3[r"\bfleet = \{\s*(destroy|delete)_fleet = this\s*\}"] = (
@@ -1810,6 +1806,9 @@ if code_cosmetic and not only_warning:
         r"([\t ]+)NO[TR] = \{\s*([^{}#\r\n]+)\s*\}\s*?\n\s*NO[TR] = \{\s*([^{}#\r\n]+)\s*\}",
         r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}",
     ]
+    # Merge no
+    targets4[r"\b\w+ = no(?: NO[TR] = \{|\s+NO[TR] = \{\s*[^{}#\n]+\s*\})"] = [r"\b(\w+) = no\s+NO[TR] = \{", r"NOR = { \1 = yes"]
+    targets4[r"\bNO[TR] = \{[^{}#\n]+\}\s+\w+ = no"] = [r"NO[TR] = \{\s*([^{}#\n]+?)\s*\}\s+(\w+) = no$", r"NOR = { \1 \2 = yes }"]
     targets4[
         r"\n\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}"
     ] = [
@@ -1870,13 +1869,15 @@ if code_cosmetic and not only_warning:
         r"(\n\w+_event = \{)\n    (#[^\n]+)",
         ("events", r"\n\2\1"),
     ]
-    targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = (
-        r"count\1 limit = {\2} count = 0 }"
-    )
+    targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = ( r"count\1 limit = {\2} count = 0 }" )
+    targets3[r"\bany(_\w+ = {)\s*\}"] = (r"count\1 count > 0 }")
     targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [
         r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}",
         r"\1count\5\2limit = {\6}\2count = 0\3\4}",
     ]
+    targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
+    # targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value [<=>]+ \d+\s+\}"] = [ r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }" ]
+    
     # NAND <=> OR = { NOT
     # targets4[r"\s+OR = \{\s*(?:(?:NOT = \{[^{}#]+?|\w+ = \{[^{}#]+? = no)\s+?\}\s+?){2}\s*\}\n"] = [r"OR = \{(\s*)(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}\s+(?:NOT = \{\s*([^{}#]+?)|(\w+ = \{[^{}#]+? = )no)\s+?\}", lambda p: "NAND = {"+p.group(1)+(p.group(2) if isinstance(p.group(2), str) and p.group(2) != "" else p.group(3)+"yes }")+p.group(1)+(p.group(4) if isinstance(p.group(4), str) and p.group(4) != "" else p.group(5)+"yes }")]
     targets4[
