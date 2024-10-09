@@ -24,10 +24,10 @@ stellaris_version = only_upto_version + '.2' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0  # without writing file=log_file
-mergerofrules = 0  # TODO auto detect?
+mergerofrules = 1  # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0  # TODO
 
@@ -1775,7 +1775,7 @@ if code_cosmetic and not only_warning:
             re.I,
         )
     ] = r"\1 \2 = no }"
-    targets4[r"\bNO[RT] = \{\s*\w+? = yes\s*\}"] = [
+    targets4[r"[^#]\s+NO[RT] = \{\s*\w+? = yes\s*\}"] = [
         r"NO[RT] = \{\s*(\w+? = )yes\s*\}",
         r"\1no",
     ]
@@ -1807,8 +1807,8 @@ if code_cosmetic and not only_warning:
         r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}",
     ]
     # Merge no
-    targets4[r"\b\w+ = no(?: NO[TR] = \{|\s+NO[TR] = \{\s*[^{}#\n]+\s*\})"] = [r"\b(\w+) = no\s+NO[TR] = \{", r"NOR = { \1 = yes"]
-    targets4[r"\bNO[TR] = \{[^{}#\n]+\}\s+\w+ = no"] = [r"NO[TR] = \{\s*([^{}#\n]+?)\s*\}\s+(\w+) = no$", r"NOR = { \1 \2 = yes }"]
+    targets4[r"[^#]\s+\w+ = no(?: NO[TR] = \{|\s+NO[TR] = \{\s*[^{}#\n]+\s*\})"] = [r"\b(\w+) = no\s+NO[TR] = \{", r"NOR = { \1 = yes"]
+    targets4[r"[^#]\s+NO[TR] = \{[^{}#\n]+\}\s+\w+ = no"] = [r"NO[TR] = \{\s*([^{}#\n]+?)\s*\}\s+(\w+) = no$", r"NOR = { \1 \2 = yes }"]
     targets4[
         r"\n\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}"
     ] = [
@@ -1865,12 +1865,10 @@ if code_cosmetic and not only_warning:
         )
         + "_machine_age = yes",
     ]
-    targets4[r"\n\w+_event = \{\n\s*#[^\n]+"] = [
-        r"(\n\w+_event = \{)\n    (#[^\n]+)",
-        ("events", r"\n\2\1"),
-    ]
+    targets4[r"\n\w+_event = \{\n\s*#[^\n]+"] = [r"(\n\w+_event = \{)\n    (#[^\n]+)", ("events", r"\n\2\1")]
     targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = ( r"count\1 limit = {\2} count = 0 }" )
     targets3[r"\bany(_\w+ = {)\s*\}"] = (r"count\1 count > 0 }")
+    targets4[r"\bfederation = \{\s+any_member = \{\s+[^{}#]+\s+\}"] = [r"\bfederation = \{\s+any_member = \{\s+([^{}#]+)\s+\}", r"any_federation_ally = { \1"]
     targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [
         r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}",
         r"\1count\5\2limit = {\6}\2count = 0\3\4}",
