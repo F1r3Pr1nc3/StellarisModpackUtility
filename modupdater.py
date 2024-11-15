@@ -10,7 +10,7 @@ from tkinter import messagebox
 
 # from pathlib import Path
 # @author: FirePrince
-only_upto_version = "3.13"  #  Should be number string
+only_upto_version = "3.14"  #  Should be number string
 
 # @revision: 2024/10/02
 # @thanks: OldEnt for detailed rundowns (<3.2)
@@ -20,7 +20,7 @@ only_upto_version = "3.13"  #  Should be number string
 # @TODO: replace in *.YML ?
 # @TODO: extended support The Merger of Rules ?
 
-stellaris_version = only_upto_version + '.2' # @last supported sub-version
+stellaris_version = only_upto_version + '.15' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
@@ -28,7 +28,7 @@ code_cosmetic = 1
 also_old = 0
 debug_mode = 0  # without writing file=log_file
 mergerofrules = 1  # TODO auto detect?
-keep_default_country_trigger = 0
+keep_default_country_trigger = 1
 output_log = 0  # TODO
 
 # Print available options and descriptions if /? or --help is provided
@@ -234,14 +234,20 @@ actuallyTargets = {
     "targets4": {},  # Multiline syntax # key (pre match without group or one group): arr (search, replace) or str (if no group or one group) # re flags=re.I|re.M|re.A
 }
 
+
+   
+
 v3_13 = {
     "targetsR": [
-        [r"^\s+[^#]*?\bhas_authority\b", "Replaced in v.3.13 with scripted trigger"]
+        # [r"^\s+[^#]*?\bhas_authority\b", "Replaced in v.3.13 with scripted trigger"]
     ],
     "targets3": {
         r"\bhas_authority = (\"?)auth_(imperial|democratic|oligarchic|dictatorial)\1\b":  (no_trigger_folder, r"is_\2_authority = yes"),
     },
-    "targets4": {},
+    "targets4": {
+        # SEE README_NAME_LISTS.txt
+        r"\bruler_names\s*=\s*\{\s*default\s*=\s*\{\s*full_names\s*=\s*\{": ( "common/name_lists", "regnal_full_names = {" ),
+    },
 }
 
 """== 3.12 Quick stats ==
@@ -1596,14 +1602,10 @@ if also_old:
     ## 2.0
     # planet trigger fortification_health was removed
     ## 2.2
-    targets3[r"(\s*)empire_unique\s*=\s*yes"] = (
-        "common/buildings",
-        r"\1base_cap_amount = 1",
-    )
-    targets3[r"\s+(?:outliner_planet_type|tile_set) = \w+\s*"] = (
-        "common/planet_classes",
-        "",
-    )
+    targets3[r"(\s*)planet_unique\s*=\s*yes"] = ("common/buildings", r"\1base_cap_amount = 1")
+    targets3[r"(\s*)empire_unique\s*=\s*yes"] = ("common/buildings", r"\1empire_limit = { base = 1 }")
+    targets3[r"(\s*)is_listed = no"] = ("common/buildings", r"\1can_build = no")
+    targets3[r"\s+(?:outliner_planet_type|tile_set) = \w+\s*"] = ("common/planet_classes", "", )
     targets3[r"\b(?:add|set)_blocker = \"?tb_(\w+)\"?"] = (
         r"add_deposit = d_\1"  # More concrete? r"add_blocker = { type = d_\1 blocked_deposit = none }"
     )
@@ -1611,24 +1613,18 @@ if also_old:
     targets3[r"\b(building_capital)(?:_\d)\b"] = r"\1"
     targets3[r"\b(betharian_power_plant)\b"] = r"building_\1"
     targets3[r"\b(building_hydroponics_farm)_[12]\b"] = r"\1"
-    targets3[r"\bbuilding_hydroponics_farm_[34]\b"] = (
-        r"building_food_processing_facility"
-    )
-    targets3[r"\bbuilding_hydroponics_farm_[5]\b"] = r"building_food_processing_center"
-    targets3[r"\bbuilding_power_plant_[12]\b"] = r"building_energy_grid"
-    targets3[r"\bbuilding_power_plant_[345]\b"] = r"building_energy_nexus"
-    targets3[r"\bbuilding_mining_network_[12]\b"] = (
-        "building_mineral_purification_plant"
-    )
+    targets3[r"\bbuilding_hydroponics_farm_[34]\b"] = "building_food_processing_facility"
+    targets3[r"\bbuilding_hydroponics_farm_[5]\b"] = "building_food_processing_center"
+    targets3[r"\bbuilding_power_plant_[12]\b"] = "building_energy_grid"
+    targets3[r"\bbuilding_power_plant_[345]\b"] = "building_energy_nexus"
+    targets3[r"\bbuilding_mining_network_[12]\b"] = "building_mineral_purification_plant"
     targets3[r"\bbuilding_mining_network_[345]\b"] = "building_mineral_purification_hub"
     # TODO needs more restriction
     # targets3[r"(?<!add_resource = \{)(\s+)(%s)\s*([<=>]+\s*-?\s*(?:@\w+|\d+))\1(?!(%s))" % (resource_items, resource_items)] = (["common/scripted_triggers", "common/scripted_effects", "events"], r"\1has_resource = { type = \2 amount \3 }")
     # Unknown old version
     targets3[r"\bcountry_resource_(influence|unity)_"] = r"country_base_\1_produces_"
     targets3[r"\bplanet_unrest_add"] = "planet_stability_add"
-    targets3[r"\bshipclass_military_station_hit_points_"] = (
-        "shipclass_military_station_hull_"
-    )
+    targets3[r"\bshipclass_military_station_hit_points_"] = "shipclass_military_station_hull_"
     targets3[r"(.+?)\sorbital_bombardment = (\w{4:})"] = (
         r"\1has_orbital_bombardment_stance = \2"  # exclude country_type option
     )
@@ -1636,9 +1632,8 @@ if also_old:
     targets3[r"\btech_spaceport_(\d)\b"] = r"tech_starbase_\1"
     targets3[r"\btech_mining_network_(\d)\b"] = r"tech_mining_\1"
     targets3[r"\bgarrison_health\b"] = r"army_defense_health_mult"
-    targets3[r"\bplanet_jobs_minerals_mult\b"] = r"planet_jobs_minerals_produces_mult"
-    targets3[r"country_flag = flesh_weakened\b"] = r"country_flag = cyborg_empire"
-
+    targets3[r"\bplanet_jobs_minerals_mult\b"] = "planet_jobs_minerals_produces_mult"
+    targets3[r"country_flag = flesh_weakened\b"] = "country_flag = cyborg_empire"
     targets3[r"\bhas_government = ([^g][^o][^v])"] = r"has_government = gov_\1"
     targets3[r"\bgov_ordered_stratocracy\b"] = "gov_citizen_stratocracy"
     targets3[r"\bgov_military_republic\b"] = "gov_military_commissariat"
@@ -1720,7 +1715,7 @@ if code_cosmetic and not only_warning:
                 "Apocalypse",
                 "Arachnoid Portrait Pack",
                 "Creatures of the Void Portrait Pack",
-                "Synthetic Dawn Story Pack",
+                # "Synthetic Dawn Story Pack",
             }
             else "has_"
             + {
@@ -1736,7 +1731,7 @@ if code_cosmetic and not only_warning:
                 "Overlord": "overlord_dlc",
                 "Plantoids Species Pack": "plantoids",
                 "Plantoid": "plantoids",
-                # "Synthetic Dawn Story Pack": "synthetic_dawn", enable it later - changed in v.3.12
+                "Synthetic Dawn Story Pack": "synthetic_dawn", # enable it later - changed in v.3.12
                 "Toxoids Species Pack": "toxoids",
                 "First Contact Story Pack": "first_contact_dlc",
                 "Galactic Paragons": "paragon_dlc",
