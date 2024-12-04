@@ -20,15 +20,15 @@ only_upto_version = "3.14"  #  Should be number string
 # @TODO: replace in *.YML ?
 # @TODO: extended support The Merger of Rules ?
 
-stellaris_version = only_upto_version + '.15' # @last supported sub-version
+stellaris_version = only_upto_version + '.159' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
-code_cosmetic = 1
+code_cosmetic = 0
 also_old = 0
 debug_mode = 0  # without writing file=log_file
-mergerofrules = 1  # TODO auto detect?
-keep_default_country_trigger = 1
+mergerofrules = 0 # TODO auto detect?
+keep_default_country_trigger = 0
 output_log = 0  # TODO
 
 # Print available options and descriptions if /? or --help is provided
@@ -1522,16 +1522,19 @@ actuallyTargets = {
     },
 }
 
-if only_upto_version == "3.13":
+if only_upto_version == "3.14":
+    print("only_upto_version", only_upto_version)
+    only_upto_version = 3.99 # exception
+elif only_upto_version == "3.13":
     print("only_upto_version", only_upto_version)
     only_upto_version = 3.98 # exception
-if only_upto_version == "3.12":
+elif only_upto_version == "3.12":
     print("only_upto_version", only_upto_version)
     only_upto_version = 3.97  # exception
-if only_upto_version == "3.11":
+elif only_upto_version == "3.11":
     print("only_upto_version", only_upto_version)
     only_upto_version = 3.96  # exception
-if only_upto_version == "3.10":
+elif only_upto_version == "3.10":
     print("only_upto_version", only_upto_version)
     only_upto_version = 3.95  # exception
 only_upto_version = float(only_upto_version)
@@ -1549,6 +1552,7 @@ if only_upto_version >= 3.96:
     actuallyTargets["targets3"].update(v3_11["targets3"])
     actuallyTargets["targets4"].update(v3_11["targets4"])
 if only_upto_version >= 3.95:
+    print("Init targtes 3.10")
     actuallyTargets["targetsR"].extend(v3_10["targetsR"])
     actuallyTargets["targets3"].update(v3_10["targets3"])
     actuallyTargets["targets4"].update(v3_10["targets4"])
@@ -1569,7 +1573,7 @@ if only_upto_version >= 3.6:
     actuallyTargets["targets3"].update(v3_6["targets3"])
     actuallyTargets["targets4"].update(v3_6["targets4"])
 if only_upto_version >= 3.5:
-    # print("Init targtes 3.5")
+    print("Init targtes 3.5")
     actuallyTargets["targetsR"].extend(v3_5["targetsR"])
     actuallyTargets["targets3"].update(v3_5["targets3"])
     actuallyTargets["targets4"].update(v3_5["targets4"])
@@ -1804,12 +1808,7 @@ if code_cosmetic and not only_warning:
     # Merge no
     targets4[r"[^#]\s+\w+ = no(?: NO[TR] = \{|\s+NO[TR] = \{\s*[^{}#\n]+\s*\})"] = [r"\b(\w+) = no\s+NO[TR] = \{", r"NOR = { \1 = yes"]
     targets4[r"[^#]\s+NO[TR] = \{[^{}#\n]+\}\s+\w+ = no"] = [r"NO[TR] = \{\s*([^{}#\n]+?)\s*\}\s+(\w+) = no$", r"NOR = { \1 \2 = yes }"]
-    targets4[
-        r"\n\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}"
-    ] = [
-        r"random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}",
-        "event_target:global_event_country = {",
-    ]
+    targets4[r"\n\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}" ] = [r"random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}", "event_target:global_event_country = {", ]
     # unnecessary AND
     targets4[
         r"\b((?:%s) = \{(\s+)(?:AND|this) = \{(?:\2\t[^\n]+)+\2\}\n)" % triggerScopes
@@ -2313,6 +2312,11 @@ def modfix(file_list):
                                 # elif debug_mode and isinstance(folder, re.Pattern): print("DEBUG Match "targets3":", pattern, repl, type(repl), line.strip().encode(errors='replace'))
 
                     out += line
+            
+                if line[-1] != "\n":
+                    out += "\n"
+                    print("Added missing empty line.", i, line, len(line))
+                    changed = True
 
                 # for pattern, repl in targets4.items(): old dict way
                 for pattern in targets4:  # new list way
