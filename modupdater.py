@@ -20,7 +20,7 @@ only_upto_version = "3.14"  #  Should be number string
 # @TODO: replace in *.YML ?
 # @TODO: extended support The Merger of Rules ?
 
-stellaris_version = only_upto_version + '.159' # @last supported sub-version
+stellaris_version = only_upto_version + '.1592' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
@@ -235,8 +235,6 @@ actuallyTargets = {
 }
 
 
-   
-
 v3_13 = {
     "targetsR": [
         # [r"^\s+[^#]*?\bhas_authority\b", "Replaced in v.3.13 with scripted trigger"]
@@ -247,6 +245,10 @@ v3_13 = {
     "targets4": {
         # SEE README_NAME_LISTS.txt
         r"\bruler_names\s*=\s*\{\s*default\s*=\s*\{\s*full_names\s*=\s*\{": ( "common/name_lists", "regnal_full_names = {" ),
+        r"\bany_owned_pop\s*=\s*\{\s*is_enslaved\s*=\s*(?:yes|no)\s*\}": [
+            r"any_owned_pop\s*=\s*\{\s*is_enslaved\s*=\s*(yes|no)\s*",
+            lambda p: "count_enslaved_species = { count " + {"yes": ">", "no": "="}[p.group(1)] + " 0 "
+        ]
     },
 }
 
@@ -301,10 +303,7 @@ v3_12 = {
         r"\bgovernment_election_years_(add|mult)\b": r"election_term_years_\1",  # 3.12.3
     },
     "targets4": {
-        r"\bOR = \{\s*(?:has_ascension_perk = ap_mind_over_matter\s+has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s+has_ascension_perk = ap_mind_over_matter)\s*\}": (
-            no_trigger_folder,
-            "has_psionic_ascension = yes",
-        ),
+        r"\bOR = \{\s*(?:has_ascension_perk = ap_mind_over_matter\s+has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s+has_ascension_perk = ap_mind_over_matter)\s*\}": ( no_trigger_folder, "has_psionic_ascension = yes" ),
         r"\bOR = \{\s*(?:has_ascension_perk = ap_synthetic_(?:evolution|age)\s+has_origin = origin_synthetic_fertility|has_origin = origin_synthetic_fertility\s+has_ascension_perk = ap_synthetic_(?:evolution|age))\s*\}": (
             no_trigger_folder,
             "has_synthetic_ascension = yes",
@@ -553,8 +552,7 @@ v3_9 = {
         r"\b(?:is_orbital_ring = no|has_starbase_size >= starbase_outpost)": "is_normal_starbase = yes",
         r"\b(?:is_normal_starbase = no|has_starbase_size >= orbital_ring_tier_1)": "is_orbital_ring = yes",
         # r'\bhas_starbase_size (>)=? starbase_outpost': lambda p: 'is_normal_starbase = yes',
-        r"\bcan_see_in_list = (yes|no)": lambda p: "hide_leader = "
-        + {"yes": "no", "no": "yes"}[p.group(1)],
+        r"\bcan_see_in_list = (yes|no)": lambda p: "hide_leader = " + {"yes": "no", "no": "yes"}[p.group(1)],
         # r'\bis_roaming_space_critter_country_type = (yes|no)':  lambda p: {"yes": "", "no": "N"}[p.group(1)] + 'OR = {is_country_type = tiyanki is_country_type = amoeba is_country_type = amoeba_borderless }', # just temp beta
     },
     "targets4": {
@@ -803,11 +801,11 @@ v3_6 = {
         ],
         r"\sNOR = \{\s*(?:has_trait = trait_(?:latent_)?psionic\s+){2}\}": [
             r"\bNOR = \{\s*(has_trait = trait_(?:latent_)?psionic\s+){2}\}",
-            "has_psionic_species_trait = no",
+            (no_trigger_folder, "has_psionic_species_trait = no"),
         ],
         r"\sOR = \{\s*(?:has_trait = trait_(?:latent_)?psionic\s+){2}\}": [
             r"\bOR = \{\s*(has_trait = trait_(?:latent_)?psionic\s+){2}\}",
-            "has_psionic_species_trait = yes",
+            (no_trigger_folder, "has_psionic_species_trait = yes"),
         ],
         # r"\s(?:OR = \{\s*(?:has_trait = trait_(?:latent_)?psionic\s+){2}\})": "has_psionic_species_trait = yes",)
     },
@@ -1453,19 +1451,19 @@ actuallyTargets = {
         r"NO[RT] = \{\s*(?:is_country_type = (?:awakened_)?fallen_empire\s+){2}\}": "is_fallen_empire = no",
         r"\n\s+(?:OR = \{)?\s{4,}(?:is_country_type = (?:awakened_)?fallen_empire\s+){2}\}?": [
             r"(\s+)(OR = \{)?(?(2)\s{4,}|(\s{4,}))is_country_type = (?:awakened_)?fallen_empire\s+is_country_type = (?:awakened_)?fallen_empire(?(2)\1\})",
-            r"\1\3is_fallen_empire = yes",
+            (no_trigger_folder, r"\1\3is_fallen_empire = yes"),
         ],
         r"\bNO[RT] = \{\s*is_country_type = (?:default|awakened_fallen_empire)\s+is_country_type = (?:default|awakened_fallen_empire)\s+\}": "is_country_type_with_subjects = no",
         r"\bOR = \{\s*is_country_type = (?:default|awakened_fallen_empire)\s+is_country_type = (?:default|awakened_fallen_empire)\s+\}": "is_country_type_with_subjects = yes",
         r"\s+(?:OR = \{)?\s+(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+\}?": [
             r"(\s+)(OR = \{)?(?(2)\s+|(\s+))(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)(?(2)\1\})",
-            r"\1\3is_synthetic_empire = yes",
+            (no_trigger_folder, r"\1\3is_synthetic_empire = yes"),
         ],  # \s{4,}
         r"NO[RT] = \{\s*(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+\}": "is_synthetic_empire = no",
-        r"NO[RT] = \{\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*\}": "is_homicidal = no",
+        r"NO[RT] = \{\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*\}": (no_trigger_folder, "is_homicidal = no"),
         r"(?:\bOR = \{)\s{4,}?has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s+has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s+has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s*\}?": [
             r"(\bOR = \{\s+)?has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s+has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?\s+has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?(?(1)\s*\})",
-            "is_homicidal = yes",
+            (no_trigger_folder, "is_homicidal = yes"),
         ],
         r"NOT = \{\s*check_variable = \{\s*which = \"?\w+\"?\s+value = [^{}#\s=]\s*\}\s*\}": [
             r"NOT = \{\s*(check_variable = \{\s*which = \"?\w+\"?\s+value) = ([^{}#\s=])\s*\}\s*\}",
@@ -1573,7 +1571,6 @@ if only_upto_version >= 3.6:
     actuallyTargets["targets3"].update(v3_6["targets3"])
     actuallyTargets["targets4"].update(v3_6["targets4"])
 if only_upto_version >= 3.5:
-    print("Init targtes 3.5")
     actuallyTargets["targetsR"].extend(v3_5["targetsR"])
     actuallyTargets["targets3"].update(v3_5["targets3"])
     actuallyTargets["targets4"].update(v3_5["targets4"])
@@ -1803,7 +1800,7 @@ if code_cosmetic and not only_warning:
         r"\n\s+NO[TR] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[TR] = \{\s*[^{}#\n]+\s*\}"
     ] = [
         r"([\t ]+)NO[TR] = \{\s*([^{}#\r\n]+)\s*\}\s*?\n\s*NO[TR] = \{\s*([^{}#\r\n]+)\s*\}",
-        r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}",
+        (r"^(?!governments)\w+", r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}"),
     ]
     # Merge no
     targets4[r"[^#]\s+\w+ = no(?: NO[TR] = \{|\s+NO[TR] = \{\s*[^{}#\n]+\s*\})"] = [r"\b(\w+) = no\s+NO[TR] = \{", r"NOR = { \1 = yes"]
