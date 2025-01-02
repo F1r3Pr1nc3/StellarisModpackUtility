@@ -36,7 +36,7 @@ except:
 # ============== Initialize global variables ===============
 
 optimizeLoc = False  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
-optimizeLocString = "lbd"  # only used if optimizeLoc is True
+optimizeLocString = "fatalf"  # only used if optimizeLoc is True
 
 loadVanillaLoc = False  # True BETA: replaces exact matching strings with vanilla ones
 loadVanillaLocUpdateDefault = False  # only usable if loadVanillaLoc
@@ -58,36 +58,39 @@ key_IGNORE = ""  # stops copying over localisations keys with this starting patt
 # localModPath = ["The Storm Cluster", ["simp_chinese", "korean"]]
 # localModPath = ["Starbase_Strong", ["russian", "simp_chinese", "french", "polish", "japanese", "korean"]]
 localModPath = ["prob", []]
-localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
 # localModPath = ["E&CC", []]
 # localModPath = ["c:/Games/steamapps/workshop/content/281990/2915166985", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 # localModPath = ["Gray Tempest Shipset", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["CrisisManager_Sleeper", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_MidGame", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_EndGame", ["french", "polish", "japanese", "korean"]]
-localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean", ], ]
+localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Enhanced Gene Modding", ["spanish", "braz_por", "polish", "japanese"]]
-localModPath = ["Engineers of Life", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"], ]
-localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
-localModPath = ["FATALF", ["english"]]
-localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"], ]
-localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
-localModPath = ["TheGreatKhanExpanded", []]
-localModPath = ["c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch", ["german", "french", "polish", "simp_chinese", "japanese", "korean"], ]
-localModPath = ["distant_stars_overhaul", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
+localModPath = ["Engineers of Life", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
+localModPath = ["c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch", ["german", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["distant_stars_overhaul", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
-localModPath = ["Daemonic_Incursion", ["english"]]
 localModPath = ["Rise and Fall", ["english"]]
-localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean", ], ]
-localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
-localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"], ]
-localModPath = ["Special Project Extended", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
-localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
+localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["Special Project Extended", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Destiny", ["english"]]
+localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
+localModPath = ["Adeptus Mechanicus Addon", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["CrimsonThrong", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"]]
+localModPath = ["Daemonic_Incursion", []]
+localModPath = ["Counter-Limited Armies Fix", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["TheGreatKhanExpanded", []]
+localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
+localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"]]  # , "korean" partial
-localModPath = ["ADeadlyTempest", ["english", "polish", "korean"]]
-localModPath = ["Loud But Deadly", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ], ]
+localModPath = ["ADeadlyTempest", ["polish", "korean"]]
+localModPath = ["FATALF", ["english"]]
+localModPath = ["Loud But Deadly", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
@@ -98,11 +101,25 @@ print(localModPath, local_OVERHAUL)
 
 # mods_registry = "mods_registry.json" # old launcher (changed in 2.7.2)
 mods_registry = "settings.txt"
-localizations = ["english", "german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean", ]  # , "italian"
+localizations = ["english", "german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]  # , "italian"
 
 
 # old, new = string
 def replaceLoc(old, new, doc):
+    """
+    Replace occurrences of a specified localization string in a given document and files.
+    Parameters:
+        old (str): The localization string to be replaced.
+        new (str): The new localization string to replace the old one.
+        doc (dict): A dictionary representing the document where replacements will be made.
+    This function performs the following actions:
+    1. Replaces occurrences of the old localization string in the provided document dictionary.
+    2. If the old string is found in any of the files listed in `optimizeLoc`, it replaces it with the new string.
+    3. The function handles both direct string replacements and regex-based replacements depending on the case of the old string.
+    4. If changes are made and the old string is part of a specific condition, it may also remove the old string from the document.
+    Returns:
+        None: The function modifies the document and files in place.
+    """
     # print(type(optimizeLoc), "OLD", old, "NEW", new)
     changed = False
     oldRe = "$" + old + "$"
@@ -201,7 +218,8 @@ def getYAMLstream(lang, filename):
     lang = os.path.join(os.getcwd(), filename)
     # print(lang)
     if os.path.isfile(lang):
-        return io.open(lang, "rb")  # "rb" , encoding='utf-8-sig'
+        return io.open(lang, "rb")  # encoding='utf-8-sig'
+        # return io.open(lang, 'r', encoding='utf-8-sig')  # Read file content as a string
 
 
 if loadVanillaLoc and len(local_OVERHAUL) > 0:
@@ -243,7 +261,7 @@ if loadVanillaLoc and len(local_OVERHAUL) > 0:
             print(r"*** Reading Stellaris path from %s ***" % (aKey))
             if proc_arch == "x86" and not proc_arch64:
                 # 32-bit system
-                arch_keys = {0} 
+                arch_keys = {0}
             elif proc_arch == "amd64" or proc_arch64:
                 # 64-bit system
                 arch_keys = {winreg.KEY_WOW64_32KEY, winreg.KEY_WOW64_64KEY}
@@ -508,12 +526,11 @@ yaml.allow_unicode = True
 # if __name__ == '__main__':
 # yaml.warnings({'YAMLLoadWarning': False})
 
-if loadVanillaLoc and isinstance(loadVanillaLoc, dict):
-    loadVanillaLoc = (
-        loadVanillaLoc.items()
-    )  # (May switched dict has better performance?)
-else:
+if not loadVanillaLoc or not isinstance(loadVanillaLoc, dict):
     loadVanillaLoc = False
+# else:
+#     loadVanillaLoc = (loadVanillaLoc.items())
+#     # (May switched dict has better performance?)
 
 # CrisisManagerEvent_l_english ,'**'
 
@@ -538,20 +555,26 @@ for filename in ymlfiles:
     # doc = tr(dictionary['l_english'])
     # dictionary = yaml.load(tr(streamEn), Loader=yaml.FullLoader)
     dictionary = yaml.safe_load(tr(streamEn))
+    if not dictionary or not isinstance(dictionary, dict):
+        print("Warning: no YML data found at", filename)
+        break
     # print("New document:", type(dictionary))
     doc = dictionary["l_" + defaultLang]
-    # print(type(doc), isinstance(doc, dict)) True
+    if not doc or not isinstance(doc, dict):
+        print("Warning: no YML data found at", filename)
+        break
+    # print(type(doc), isinstance(doc, dict))
     # print(type(loadVanillaLoc), isinstance(loadVanillaLoc, dict)) # type(loadVanillaLoc) == dict class 'dict_items'
 
     # Replace with Vanilla
     if loadVanillaLoc and isinstance(doc, dict):
         changed = False
-        # print("LOAD loadVanillaLoc", type(loadVanillaLoc)) # = dict_items
-        for vkey, vvalue in loadVanillaLoc:
+        print("LOAD loadVanillaLoc", type(loadVanillaLoc)) # = dict_items
+        for vkey, vvalue in loadVanillaLoc.copy().items():
             if (
                 len(vvalue) > 2
                 and not vvalue.startswith("$")
-                and len(vvalue) < 64
+                and len(vvalue) <= 72
                 and vvalue.count("$", 1, -3) == 0
             ):
                 for k, v in doc.copy().items():
@@ -566,27 +589,24 @@ for filename in ymlfiles:
                     elif (
                         len(v) > 2
                         and not (v.startswith("$") and v.endswith("$"))
-                        and len(v) < 64
+                        and len(v) <= 72
                         and v.count("$", 1, -3) == 0
                     ):
                         if v == vvalue:
                             doc[k] = "$" + vkey + "$"
                             changed = True
                             print(k, "REPLACED dupe with:", vkey)
-                        elif optimizeLoc and trimEnd.sub("", v) == trimEnd.sub(
-                            "", vvalue
-                        ):
+                        elif optimizeLoc and trimEnd.sub("", v) == trimEnd.sub("", vvalue ):
                             doc[k] = "$" + vkey + "$"
                             changed = True
                             print(k, "REPLACED near dupe with:", vkey)
-                        # elif optimizeLoc: # also own duplicates
-                        #     loadVanillaLoc[k] = v
+                        elif optimizeLoc: # also own duplicates
+                            loadVanillaLoc[k] = v
 
-                    # elif optimizeLoc: # also own duplicates
-                    #     loadVanillaLoc[k] = v
-
-                # if optimizeLoc and k in doc and v.startswith("$") and v.endswith("$") and len(v) < 60:
-                #     replaceLoc(k, trimDupe.sub(r'"\1"', v), doc)
+                    elif optimizeLoc: # also own duplicates
+                        loadVanillaLoc[k] = v
+                if optimizeLoc and k in doc and v.startswith("$") and v.endswith("$") and len(v) < 60:
+                    replaceLoc(k, trimDupe.sub(r'"\1"', v), doc)
 
         if changed and loadVanillaLocUpdateDefault:
             loadVanillaLocUpdateDefault = True
@@ -599,12 +619,12 @@ for filename in ymlfiles:
         print("optimize Loc")
         docCopy = doc.copy()
         for k, v in doc.copy().items():
-            if len(v) < 4:
-                continue
+            # if len(v) < 4:
+            #     continue
             if (
                 v.startswith("$")
                 and v.endswith("$")
-                and len(v) < 64
+                and len(v) <= 72
                 and v.count("$", 1, -3) == 0
             ):
                 kt = trimDupe.sub(r"\1", v)
@@ -614,7 +634,7 @@ for filename in ymlfiles:
                     if (
                         vt.startswith("$")
                         and vt.endswith("$")
-                        and len(vt) < 64
+                        and len(vt) <= 72
                         and vt.count("$", 1, -3) == 0
                     ):
                         replaceLoc(kt, vt, docCopy)
@@ -675,29 +695,31 @@ for filename in ymlfiles:
         if not stream:
             stream = {}
             print("Create new document " + lang)
-            if lang == "spanish" and "braz_por" not in local_OVERHAUL:
-                stream = streamEn.replace(b"l_braz_por", bytes("l_" + lang, "utf-8"))
-            elif lang == "braz_por" and "spanish" not in local_OVERHAUL:
-                stream = streamEn.replace(b"l_spanish", bytes("l_" + lang, "utf-8"))
+            if lang == "spanish" and "braz_por" not in local_OVERHAUL and data.startswith(b"l_braz_por"):
+                stream = streamEn.replace(b"l_braz_por", bytes("l_spanish", "utf-8"))
+            elif lang == "braz_por" and "spanish" not in local_OVERHAUL and data.startswith(b"l_spanish"):
+                stream = streamEn.replace(b"l_spanish", bytes("l_braz_por", "utf-8"))
             else:
-                stream = streamEn.replace(
-                    bytes("l_" + defaultLang, "utf-8"), bytes("l_" + lang, "utf-8")
-                )
+                stream = streamEn.replace(bytes("l_" + defaultLang, "utf-8"), bytes("l_" + lang, "utf-8") )
             # copy file with new header
             writeStream(lang, stream, filename)
             continue
         else:
             stream = stream.read()
-            # print(stream[0],"BOM", filename.replace("english", lang))
-            # changed = testYAML_BOM(stream.read(3))
-            if stream[0] != 239:  # b'ufeff':
-                print(filename.replace(defaultLang, lang), "not UTF8-BOM", stream[0])
-                changed = True
+            if lang != defaultLang:
+                # print(stream[0],"BOM", filename.replace("english", lang))
+                # changed = testYAML_BOM(stream.read(3))
+                if stream[0] != 239:  # b'ufeff':
+                    print(filename.replace(defaultLang, lang), "not UTF8-BOM", stream[0])
+                    changed = True
 
         langStream = tr(stream)
         # print("Str document:", type(langStream), langStream)
         # langStream = yaml.load(langStream, Loader=yaml.FullLoader)
         langStream = yaml.safe_load(langStream)
+        if not langStream or not isinstance(langStream, dict):
+            print("Warning: no YML data found at", filename)
+            break
 
         if "l_" + lang not in langStream:  # not langStream.startswith("l_"+lang):
             print(
@@ -717,7 +739,7 @@ for filename in ymlfiles:
         print("Dict document:", type(langStream), lang, isinstance(langDict, dict))
 
         # for _, doc in dictionary.items():
-        if isinstance(langDict, dict):
+        if isinstance(langDict, dict) and isinstance(doc, dict):
             # reDupe = re.compile(r"^\$[^$]+?\$$") # don't use re in a loop
             for key, value in doc.items():
                 # print(key, value)
