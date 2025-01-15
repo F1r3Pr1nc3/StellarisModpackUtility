@@ -2058,13 +2058,9 @@ def parse_dir():
 
 	print("Welcome to Stellaris Mod-Updater-%s by F1r3Pr1nc3!" % stellaris_version)
 
-	if not os.path.isdir(mod_path):
-		mod_path = os.getcwd()
-	mod_path = iBox("Please select a mod folder:", mod_path)
-	# mod_path = input('Enter target directory: ')
-	# mod_outpath = iBox('Enter out directory (optional):', mod_path)
-	# mod_outpath = input('Enter out directory (optional):')
-	# mod_outpath = os.path.normpath(mod_outpath)
+	if not os.path.isdir(mod_path) or not os.path.isfile(os.path.join(mod_path, "descriptor.mod")):
+		mod_path = os.getcwd() if not os.path.isdir(mod_path) else mod_path
+		mod_path = iBox("Please select a mod folder:", mod_path)
 
 	if not os.path.isdir(mod_path):
 		# except OSError:
