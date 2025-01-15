@@ -246,6 +246,8 @@ v3_14 = {
 		)],
 		r"\bany_owned_pop = \{\s*is_robot(?:_pop|ic) = (?:yes|no)\s*\}": [
 			r"any_owned_pop = \{\s*is_robot(?:_pop|ic)  = (yes|no)\s*\}", (no_trigger_folder, r"any_owned_species = { is_robotic = \1 }")],
+		r"\bset_faction_hostility = \{\s*target = [\d\w\.:]+(?:\s+set_(?:hostile|neutral|friendly) = (?:yes|no)){3}\s*\}": [
+			r"\s*target = ([\d\w\.:]+)\s+(?:\w+ = no\s+){0,2}(set_(?:hostile|neutral|friendly) = yes)\s*?(?:\w+ = no\s+){0,2}\s*\}", r" target = \1 \2 }"],
 		r"\bN?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
 			r"(N)?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
 			lambda p: "is_robotic = " + ("no" if p.group(1) else "yes")
@@ -541,30 +543,12 @@ v3_10 = {
 
 v3_9 = {
 	"targetsR": [
-		[
-			r"^[^#]+?\sland_army\s",
-			"Removed army parameter from v.3.8 in v.3.9:",
-		],  # only from 3.8
-		[
-			r"^[^#]+?\bhabitat_0\s",
-			"Removed in v.3.9: replaceable with 'major_orbital'",
-		],  # only from 3.8
-		[
-			r"^[^#]+?\sdistrict_hab_cultural",
-			"Removed in v.3.9: replaceable with 'district_hab_housing'?",
-		],
-		[
-			r"^[^#]+?\sdistrict_hab_commercial",
-			"Removed in v.3.9: replaceable with 'district_hab_energy'?",
-		],
-		[
-			r"^[^#]+?\sis_regular_empire_or_primitive\b",
-			"Removed in v.3.9.0 from 3.6: replaceable with OR = { is_regular_empire is_primitive = yes }?",
-		],  # only from 3.8
-		[
-			r"^[^#]+?\sis_space_critter_country_type\b",
-			"Removed in v.3.9.2: possible replaceable with 'is_non_hostile_to_wraith'?",
-		],  # only from 3.8
+		[r"^[^#]+?\sland_army\s", "Removed army parameter from v.3.8 in v.3.9:", ],  # only from 3.8
+		[r"^[^#]+?\bhabitat_0\s", "Removed in v.3.9: replaceable with 'major_orbital'", ],  # only from 3.8
+		[r"^[^#]+?\sdistrict_hab_cultural", "Removed in v.3.9: replaceable with 'district_hab_housing'?", ],
+		[r"^[^#]+?\sdistrict_hab_commercial", "Removed in v.3.9: replaceable with 'district_hab_energy'?", ],
+		[r"^[^#]+?\sis_regular_empire_or_primitive\b", "Removed in v.3.9.0 from 3.6: replaceable with OR = { is_regular_empire is_primitive = yes }?", ],  # only from 3.8
+		[r"^[^#]+?\sis_space_critter_country_type\b", "Removed in v.3.9.2: possible replaceable with 'is_non_hostile_to_wraith'?", ],  # only from 3.8
 	],
 	"targets3": {
 		# r'\bhabitat_0\b': 'major_orbital', # 'habitat_central_complex',
@@ -807,10 +791,7 @@ v3_6 = {
 		r"\bcan_remove_beneficial_traits\b": "can_remove_beneficial_genetic_traits",
 	},
 	"targets4": {
-		r"\bis_triggered_only = yes\s+trigger = \{\s+always = no": [
-			r"(\s+)(trigger = \{\s+always = no)",
-			("events", r"\1is_test_event = yes\1\2"),
-		],
+		r"\bis_triggered_only = yes\s+trigger = \{\s+always = no": [r"(\s+)(trigger = \{\s+always = no)", ("events", r"\1is_test_event = yes\1\2")],
 		r"slot = \"?(?:SMALL|MEDIUM|LARGE)\w+\d+\"?\s+template = \"?AUTOCANNON_\d\"?": [
 			r"(=\s*\"?(SMALL|MEDIUM|LARGE)\w+\d+\"?\s+template = )\"?(AUTOCANNON_\d)\"?",
 			("common/global_ship_designs", r'\1"\2_\3"'),
@@ -1508,7 +1489,7 @@ actuallyTargets = {
 			r"count_starbase_modules = \{\s+type = (\w+)\s+count\s*>\s*0\s+\}",
 			r"has_starbase_module = \1",
 		],
-		r'\b(?:add_modifier = \{\s*modifier|set_timed_\w+ = \{\s*flag) = "?[\w@.]+"?\s+days = \d{2,}\s*\}': [
+		r'\b(?:add_modifier = \{\s*modifier|set_timed_\w+ = \{\s*flag) = "?[\w@.]+"?\s+days = \d{2,}\s*?(?:\#[^\n{}]+\n\s+)?\}': [
 			r"days = (\d{2,})\b",
 			lambda p: (
 				"years = " + str(int(p.group(1)) // 360)
@@ -1776,8 +1757,14 @@ if code_cosmetic and not only_warning:
 	)  # format comment
 	targets3[r"#([^\-\s#])"] = r"# \1"  # r"#([^\s#])": r"# \1", # format comment
 	#  targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
-	targets3[r"(?<!(?:e\.g|.\.\.))([#.][\t ][a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: p.group(1).upper() + p.group(2 )  # format comment
-	# NOT NUM triggers. TODO <> ?
+	targets3[r"(?<!(?:e\.g|.\.\.))([#.][\t ][a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: p.group(1).upper() + p.group(2)  # format comment
+	# NOT NUM triggers.
+	targets3[r"\bNOT = \{\s*(num_\w+)\s*([<=>]+)\s*(\d+)\s*\}"] = lambda p: p.group(1) +" "+ {
+				">": "<=",
+				"<": ">=",
+				">=": "<",
+				"<=": ">",
+			}[p.group(2)] +" "+ p.group(3)
 	targets3[r"\bNOT = \{\s*(num_\w+|\w+?(?:_passed)) = (\d+)\s*\}"] = r"\1 != \2"
 	targets3[r"\bfleet = \{\s*(destroy|delete)_fleet = this\s*\}"] = (
 		r"\1_fleet = fleet"  # TODO may extend
@@ -1971,7 +1958,7 @@ if mergerofrules:
 	targets3[r"\bis_country_type = fallen_empire\b"] = (no_trigger_folder, "merg_is_fallen_empire = yes")
 	targets3[r"\bis_country_type = awakened_fallen_empire\b"] = (no_trigger_folder, "merg_is_awakened_fe = yes")
 	targets3[r"is_planet_class = pc_(habitat|molten|toxic|frozen|barren|barren_cold)\b"] = (no_trigger_folder, r"merg_is_\1 = yes")
-	targets3[r"is_planet_class = pc_gaia\b"] = (no_trigger_folder, "merg_is_gaia_basic = yes") # |atw_is_gaia = yes|pd_is_planet_class_gaia = yes
+	# targets3[r"is_planet_class = pc_gaia\b"] = (no_trigger_folder, "merg_is_gaia_basic = yes") # |atw_is_gaia = yes|pd_is_planet_class_gaia = yes
 	targets3[r"\bis_pd_habitat = yes"] = (no_trigger_folder, "merg_is_habitat = yes")
 	targets3[r"\bis_planet_class = pc_relic\b"] = (no_trigger_folder, "merg_is_relic_world = yes")
 	targets3[r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)"] = (no_trigger_folder, "merg_is_machine_world = yes")
