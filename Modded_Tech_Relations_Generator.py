@@ -7,6 +7,7 @@
 import json
 import os
 import re
+import ctypes
 try: from winreg import *
 except: print("Not running Windows")
 
@@ -21,6 +22,7 @@ techWeights = True
 loadVanillaTech = False
 
 modsPath = ''
+modsPath2 = ""
 stellarisPath = ''
 selectedEncoding = 'UTF-8'
 forbiddenFileChars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
@@ -84,8 +86,16 @@ if os.name == 'nt' and len(modsPath) < 1 or not os.path.isdir(modsPath):
 else:
     modsPath = os.path.expanduser('~\\.steam\\steam' + workshopDir)
     stellarisPath = os.path.expanduser('~\\.steam\\steam' + steamStellarisDir)
-
-
+    
+if modsPath2 is None or modsPath2 == '':
+	if os.path.exists(os.path.expanduser('~') + '/Documents/Paradox Interactive/Stellaris/mod'):
+		modsPath2 = os.path.expanduser('~') + '/Documents/Paradox Interactive/Stellaris/mod'
+	else:
+		CSIDL_PERSONAL = 5
+		SHGFP_TYPE_CURRENT = 0
+		temp = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+		ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, temp)
+		modsPath2 = temp.value + '/Paradox Interactive/Stellaris/mod'
 
 if scriptConfig["stellarisPath"] and len(scriptConfig["stellarisPath"]) > 0 and scriptConfig["stellarisPath"] != "default":
     stellarisPath = scriptConfig["stellarisPath"]
@@ -262,6 +272,12 @@ for item in os.listdir(modsPath):
     if os.path.isdir(modPath):
         if os.path.isdir(os.path.join(modPath, 'common', 'technology')):
             techMods.append(item)
+print("Working in directory: " + modsPath2)
+for item in os.listdir(modsPath2):
+    modPath = os.path.join(modsPath2, item)
+    if os.path.isdir(modPath):
+        if os.path.isdir(os.path.join(modPath, 'common', 'technology')):
+            techMods.append(item)
 
 print("\nIndentified mods with technologies:")
 print(techMods)
@@ -295,11 +311,19 @@ if techWeights:
             print("\tLoading scripted vars from file: " + os.path.join(root, name))
             weightVars.update(loadScriptedVars(os.path.join(root, name)))
 
-    for mod in techMods:
-        for root, dirs, files in os.walk(os.path.join(modsPath, mod, 'common', 'scripted_variables')):
-            for name in files:
-                print("\tLoading scripted vars from file: " + os.path.join(root, name))
-                weightVars.update(loadScriptedVars(os.path.join(root, name)))
+    try:
+        for mod in techMods:
+            for root, dirs, files in os.walk(os.path.join(modsPath, mod, 'common', 'scripted_variables')):
+                for name in files:
+                    print("\tLoading scripted vars from file: " + os.path.join(root, name))
+                    weightVars.update(loadScriptedVars(os.path.join(root, name)))
+    except:
+        for mod in techMods:
+            for root, dirs, files in os.walk(os.path.join(modsPath2, mod, 'common', 'scripted_variables')):
+                for name in files:
+                    print("\tLoading scripted vars from file: " + os.path.join(root, name))
+                    weightVars.update(loadScriptedVars(os.path.join(root, name)))
+
 
 
 #============== Load localization files ===============
@@ -312,11 +336,18 @@ for root, dirs, files in os.walk(stellarisLocPath):
             englishTechNames.update(loadTechNames(os.path.join(root, name)))
 
 for mod in techMods:
-    for root, dirs, files in os.walk(os.path.join(modsPath, mod, 'localisation')):
-        for name in files:
-            if "english" in name:
-                print("\tLoading localization from file: " + os.path.join(root, name))
-                englishTechNames.update(loadTechNames(os.path.join(root, name)))
+    try:
+        for root, dirs, files in os.walk(os.path.join(modsPath, mod, 'localisation')):
+            for name in files:
+                if "english" in name:
+                    print("\tLoading localization from file: " + os.path.join(root, name))
+                    englishTechNames.update(loadTechNames(os.path.join(root, name)))
+    except:
+        for root, dirs, files in os.walk(os.path.join(modsPath2, mod, 'localisation')):
+            for name in files:
+                if "english" in name:
+                    print("\tLoading localization from file: " + os.path.join(root, name))
+                    englishTechNames.update(loadTechNames(os.path.join(root, name)))
 
 #============== Main script ===============
 jsonOut = {}
@@ -332,17 +363,29 @@ if loadVanillaTech:
 for mod in techMods:
     modName = ''
     try:
-        with open(os.path.join(modsPath, mod, r'descriptor.mod'), 'r', encoding=selectedEncoding, errors='replace') as file:
-            for line in file:
-                if "name" in line:
-                    modName = line.strip()[6:-1].replace('\"', '') + " [" + mod + "]"
+        if os.path.exists(os.path.join(modsPath, mod)):
+            with open(os.path.join(modsPath, mod, r'descriptor.mod'), 'r', encoding=selectedEncoding, errors='replace') as file:
+                for line in file:
+                    if "name" in line:
+                        modName = line.strip()[6:-1].replace('\"', '') + " [" + mod + "]"
+        else:
+            with open(os.path.join(modsPath2, mod, r'descriptor.mod'), 'r', encoding=selectedEncoding, errors='replace') as file:
+                for line in file:
+                    if "name" in line:
+                        modName = line.strip()[6:-1].replace('\"', '') + " [" + mod + "]"
+    except FileNotFoundError:
+        print("mod has no descriptor")
+        modName = str(mod)
     except ValueError:
         modName = "NO MOD NAME FOUND" + " [" + mod + "]"
 
     print(("\nHandling mod: " + modName).encode(errors='replace'))
     techFiles = []
     jsonOut[modName] = {}
-    modTechPath = os.path.join(modsPath, mod, 'common', 'technology')
+    try:
+        modTechPath = os.path.join(modsPath, mod, 'common', 'technology') if os.path.exists(os.path.join(modsPath, mod)) else os.path.join(modsPath2, mod, 'common', 'technology')
+    except FileNotFoundError:
+        modTechPath = os.path.join(modsPath2, mod, 'common', 'technology')
     for techFile in os.listdir(modTechPath):
         if os.path.isfile(os.path.join(modTechPath, techFile)):
             print("\tHandling file: " + techFile)
