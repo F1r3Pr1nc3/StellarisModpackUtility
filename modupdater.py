@@ -246,8 +246,9 @@ v3_14 = {
 		)],
 		r"\bany_owned_pop = \{\s*is_robot(?:_pop|ic) = (?:yes|no)\s*\}": [
 			r"any_owned_pop = \{\s*is_robot(?:_pop|ic)  = (yes|no)\s*\}", (no_trigger_folder, r"any_owned_species = { is_robotic = \1 }")],
-		r"\bset_faction_hostility = \{\s*target = [\d\w\.:]+(?:\s+set_(?:hostile|neutral|friendly) = (?:yes|no)){3}\s*\}": [
-			r"\s*target = ([\d\w\.:]+)\s+(?:\w+ = no\s+){0,2}(set_(?:hostile|neutral|friendly) = yes)\s*?(?:\w+ = no\s+){0,2}\s*\}", r" target = \1 \2 }"],
+		r"\bset_faction_hostility = \{\s*(?:target = [\d\w\.:]+)?(?:\s+set_(?:hostile|neutral|friendly) = (?:yes|no)){3}\s*(?:target = [\d\w\.:]+)?\s*\}": [
+			r"\s+(?:\w+ = no\s+){0,2}(set_(?:hostile|neutral|friendly) = yes)\s*?(?:\w+ = no\s+){0,2}\s*(target = [\d\w\.:]+)?\s*\}",
+			lambda p: " " + p.group(1) + " " + (p.group(2) + " }" if p.group(2) else "}")],
 		r"\bN?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
 			r"(N)?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
 			lambda p: "is_robotic = " + ("no" if p.group(1) else "yes")
@@ -1783,28 +1784,23 @@ if code_cosmetic and not only_warning:
 			re.I,
 		)
 	] = r"\1 \2 = no }"
-	targets4[r"[^#]\s+NO[RT] = \{\s*\w+? = yes\s*\}"] = [
-		r"NO[RT] = \{\s*(\w+? = )yes\s*\}",
-		r"\1no",
-	]
+	# Collect same scope 
+	targets4[r"exists = (\w+)\n(?:\s+\1 = \{\s*\w+ = [^{}#\n]+?\s*\}[ \t]*\n)+"] = [
+			r"(\s+\w+ = \{)\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+\1\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+(?:\1\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+)?(?:\1\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+)?(?:\1\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+)?(?:\1\s*(\w+ = [^{}#\n]+)\s*\}[ \t]*\n+)?",
+			r"\1 \2\3\4\5\6\7}\n"]  # up to 6 items
+	targets4[r"[^#]\s+NO[RT] = \{\s*\w+? = yes\s*\}"] = [r"NO[RT] = \{\s*(\w+? = )yes\s*\}", r"\1no", ]
 	targets4[r"\bany_system_planet = \{\s*is_capital = (?:yes|no)\s*\}"] = [
 		r"any_system_planet = \{\s*is_capital = (yes|no)\s*\}",
 		r"is_capital_system = \1",
 	]
 
-	## targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \1" # remove comment punctuation mark
+	# targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \1" # remove comment punctuation mark
 	# targets4[r"\n{3,}"] = "\n\n" # r"\s*\n{2,}": "\n\n", # cosmetic remove surplus lines
 	# only for planet galactic_object
 	targets4[
 		r"(?:(?:neighbor|rim|random|every|count|closest|ordered)_system|_planet|_system_colony|_within_border) = \{\s*?(?:limit = \{)?\s*exists = (?:space_)?owner\b"
-	] = [
-		r"exists = (?:space_)?owner",
-		"has_owner = yes",
-	]  # only for planet galactic_object
-	targets4[r"_event = \{\s+id = \"[\w.]+\""] = [
-		r"\bid = \"([\w.]+)\"",
-		("events", r"id = \1"),
-	]  # trim id quote marks
+	] = [r"exists = (?:space_)?owner", "has_owner = yes"]  # only for planet galactic_object
+	targets4[r"_event = \{\s+id = \"[\w.]+\""] = [r"\bid = \"([\w.]+)\"", ("events", r"id = \1"), ]  # trim id quote marks
 
 	# targets4[r"\n\s+\}\n\s+else"] = [r"\}\s*else", "} else"] # r"\s*\n{2,}": "\n\n", # cosmetic remove surplus lines
 	# WARNING not valid if in OR: NOR <=> AND = { NOT NOT } , # only 2 items (sub-trigger)
@@ -1868,13 +1864,11 @@ if code_cosmetic and not only_warning:
 		+ "_machine_age = yes",
 	]
 	targets4[r"\n\w+_event = \{\n\s*#[^\n]+"] = [r"(\n\w+_event = \{)\n    (#[^\n]+)", ("events", r"\n\2\1")]
-	targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = ( r"count\1 limit = {\2} count = 0 }")
-	targets3[r"\bany(_\w+ = {)\s*\}"] = (r"count\1 count > 0 }")
+	targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 limit = {\2} count = 0 }"
+	targets3[r"\bany(_\w+ = {)\s*\}"] = r"count\1 count > 0 }"
+	targets4[r"\bexists = owner\s+can_generate_trade_value = yes"] = "can_generate_trade_value = yes"
 	targets4[r"\bfederation = \{\s+any_member = \{\s+[^{}#]+\s+\}"] = [r"\bfederation = \{\s+any_member = \{\s+([^{}#]+)\s+\}", r"any_federation_ally = { \1"]
-	targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [
-		r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}",
-		r"\1count\5\2limit = {\6}\2count = 0\3\4}",
-	]
+	targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}", r"\1count\5\2limit = {\6}\2count = 0\3\4}" ]
 	targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
 	# targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value [<=>]+ \d+\s+\}"] = [ r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }" ]
 
@@ -2316,7 +2310,7 @@ def modfix(file_list):
 
 					out += line
 
-				if line[-1] != "\n":
+				if line[-1][0] != "\n" and line[-1][0] != "#":
 					out += "\n"
 					print("Added missing empty line.", i, line, len(line))
 					changed = True
