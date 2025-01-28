@@ -12,7 +12,7 @@ from tkinter import messagebox
 # @author: FirePrince
 only_upto_version = "3.14"  #  Should be number string
 
-# @revision: 2024/10/02
+# @revision: 2025/01/28
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -1760,12 +1760,14 @@ if code_cosmetic and not only_warning:
 	#  targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
 	targets3[r"(?<!(?:e\.g|.\.\.))([#.][\t ][a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: p.group(1).upper() + p.group(2)  # format comment
 	# NOT NUM triggers.
-	targets3[r"\bNOT = \{\s*(num_\w+)\s*([<=>]+)\s*(\d+)\s*\}"] = lambda p: p.group(1) +" "+ {
+	targets3[r"\bNOT = \{\s*(\w+)\s*([<=>]+)\s*(@\w+|-?\d+)\s+\}"] = lambda p: p.group(1) +" "+ ({
 				">": "<=",
 				"<": ">=",
 				">=": "<",
 				"<=": ">",
-			}[p.group(2)] +" "+ p.group(3)
+				"=": "!=",
+			}[p.group(2)]  ) +" "+ p.group(3) if p.group(2) != "=" or p.group(3)[0] == "@" or p.group(3)[0] == "-" or is_digit(p.group(3)) else p
+	# targets3[r"(\w+)\s*!=\s*([^\n\s<\=>{}#]+)"] = r"NOT = { \1 = \2 }"
 	targets3[r"\bNOT = \{\s*(num_\w+|\w+?(?:_passed)) = (\d+)\s*\}"] = r"\1 != \2"
 	targets3[r"\bfleet = \{\s*(destroy|delete)_fleet = this\s*\}"] = (
 		r"\1_fleet = fleet"  # TODO may extend
@@ -2016,7 +2018,6 @@ targets3 = [(re.compile(k, flags=0), targets3[k]) for k in targets3]
 targets4 = [(re.compile(k, flags=re.I), targets4[k]) for k in targets4]
 # print(datetime.datetime.now() - start_time)
 # exit()
-
 
 def mBox(mtype, text):
 	tk.Tk().withdraw()
