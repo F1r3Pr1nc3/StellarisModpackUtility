@@ -36,7 +36,7 @@ except:
 # ============== Initialize global variables ===============
 
 optimizeLoc = False  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
-optimizeLocString = "fatalf"  # only used if optimizeLoc is True
+optimizeLocString = "ccrebel"  # only used if optimizeLoc is True
 
 loadVanillaLoc = False  # True BETA: replaces exact matching strings with vanilla ones
 loadVanillaLocUpdateDefault = False  # only usable if loadVanillaLoc
@@ -64,7 +64,6 @@ localModPath = ["prob", []]
 localModPath = ["CrisisManager_Sleeper", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_MidGame", ["french", "polish", "korean"]]
 localModPath = ["CrisisManager_EndGame", ["french", "polish", "japanese", "korean"]]
-localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Enhanced Gene Modding", ["spanish", "braz_por", "polish", "japanese"]]
 localModPath = ["Engineers of Life", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
@@ -75,22 +74,25 @@ localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
 localModPath = ["Rise and Fall", ["english"]]
 localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Special Project Extended", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["Destiny", ["english"]]
 localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["Adeptus Mechanicus Addon", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["CrimsonThrong", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"]]
-localModPath = ["Daemonic_Incursion", []]
 localModPath = ["Counter-Limited Armies Fix", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["TheGreatKhanExpanded", []]
 localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
 localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"]]  # , "korean" partial
 localModPath = ["ADeadlyTempest", ["polish", "korean"]]
 localModPath = ["FATALF", ["english"]]
 localModPath = ["Loud But Deadly", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+# localModPath = ["SCM Divine Touch", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Destiny", ["english"]]
+localModPath = ["Daemonic_Incursion", []]
+localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
+localModPath = ["Potent_Rebellions", ["braz_por", "polish"]]
 
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
@@ -695,9 +697,9 @@ for filename in ymlfiles:
         if not stream:
             stream = {}
             print("Create new document " + lang)
-            if lang == "spanish" and "braz_por" not in local_OVERHAUL and data.startswith(b"l_braz_por"):
+            if lang == "spanish" and "braz_por" not in local_OVERHAUL and streamEn.startswith(b"l_braz_por"):
                 stream = streamEn.replace(b"l_braz_por", bytes("l_spanish", "utf-8"))
-            elif lang == "braz_por" and "spanish" not in local_OVERHAUL and data.startswith(b"l_spanish"):
+            elif lang == "braz_por" and "spanish" not in local_OVERHAUL and streamEn.startswith(b"l_spanish"):
                 stream = streamEn.replace(b"l_spanish", bytes("l_braz_por", "utf-8"))
             else:
                 stream = streamEn.replace(bytes("l_" + defaultLang, "utf-8"), bytes("l_" + lang, "utf-8") )
