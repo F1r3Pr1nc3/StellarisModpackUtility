@@ -12,7 +12,7 @@ from tkinter import messagebox
 # @author: FirePrince
 only_upto_version = "3.14"  #  Should be number string
 
-# @revision: 2025/01/28
+# @revision: 2025/01/29
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
 # @forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -764,6 +764,7 @@ v3_6 = {
 	],
 	"targets3": {
 		r"\bpop_assembly_speed": "planet_pop_assembly_mult",
+		r"\"%O%": ("common/name_lists", '"$ORD$'),
 		r"\bis_ringworld =": (no_trigger_folder, "has_ringworld_output_boost ="),
 		r"\btoken = citizenship_assimilation\b": (
 			"common/species_rights",
@@ -1984,7 +1985,7 @@ else:
 			"no": "NOT = { is_country_type = default }",
 		}[p.group(1)],
 	)
-	targets3[r"\bmerg_is_hab_ringworld = (yes|no)"] = "has_ringworld_output_boost = \1"
+	targets3[r"\bmerg_is_hab_ringworld = (yes|no)"] = r"has_ringworld_output_boost = \1"
 	targets3[r"(\s|\.)(?:space_)?owner = { is_country_type = default \}"] = lambda p: (
 		" = { can_generate_trade_value = yes }"
 		if p.group(1) == "."
@@ -2311,7 +2312,7 @@ def modfix(file_list):
 
 					out += line
 
-				if line[-1][0] != "\n" and line[-1][0] != "#":
+				if line[-1][0] != "\n" and not line.lstrip().startswith("#"): # and line.strip()
 					out += "\n"
 					print("Added missing empty line.", i, line, len(line))
 					changed = True
