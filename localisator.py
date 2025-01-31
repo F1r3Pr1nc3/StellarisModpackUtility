@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ###    @author FirePrince
-###    @revision 2024/10/02
+###    @revision 2025/31/01
 ###
 ###    USAGE: You need install https://pyyaml.org/wiki/PyYAMLDocumentation for Python3.x
 ###    ATTENTION: You still must customize the mod path at localModPath (and optionally the languages which should be overhauled)
@@ -82,7 +82,7 @@ localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", 
 localModPath = ["Counter-Limited Armies Fix", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["TheGreatKhanExpanded", []]
 localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]]
-localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"]]  # , "korean" partial
 localModPath = ["ADeadlyTempest", ["polish", "korean"]]
 localModPath = ["FATALF", ["english"]]
@@ -694,26 +694,32 @@ for filename in ymlfiles:
         changed = False
         lang = localizations[lang]
         stream = getYAMLstream(lang, filename)
-        if not stream:
-            stream = {}
-            print("Create new document " + lang)
-            if lang == "spanish" and "braz_por" not in local_OVERHAUL and streamEn.startswith(b"l_braz_por"):
-                stream = streamEn.replace(b"l_braz_por", bytes("l_spanish", "utf-8"))
-            elif lang == "braz_por" and "spanish" not in local_OVERHAUL and streamEn.startswith(b"l_spanish"):
-                stream = streamEn.replace(b"l_spanish", bytes("l_braz_por", "utf-8"))
-            else:
-                stream = streamEn.replace(bytes("l_" + defaultLang, "utf-8"), bytes("l_" + lang, "utf-8") )
-            # copy file with new header
+        if lang == "spanish" and "spanish" in local_OVERHAUL and "braz_por" != defaultLang and "braz_por" not in local_OVERHAUL:
+            print("braz_por replaces spanish")
+            stream = getYAMLstream("braz_por", filename).read()
+            stream = stream.replace(b"l_braz_por", bytes("l_spanish", "utf-8"))
             writeStream(lang, stream, filename)
             continue
-        else:
+        elif lang == "braz_por" and "braz_por" in local_OVERHAUL and "spanish" != defaultLang and "spanish" not in local_OVERHAUL:
+            print("spanish replaces braz_por")
+            stream = getYAMLstream("spanish", filename).read()
+            stream = stream.replace(b"l_spanish", bytes("l_braz_por", "utf-8"))
+            writeStream(lang, stream, filename)
+            continue
+        elif stream:
             stream = stream.read()
             if lang != defaultLang:
-                # print(stream[0],"BOM", filename.replace("english", lang))
-                # changed = testYAML_BOM(stream.read(3))
+                print(defaultLang.capitalize() + " replaces " + lang.capitalize())
                 if stream[0] != 239:  # b'ufeff':
                     print(filename.replace(defaultLang, lang), "not UTF8-BOM", stream[0])
                     changed = True
+        else:
+            stream = {}
+            print("Create new document " + lang)
+            # copy file with new header
+            stream = streamEn.replace(bytes("l_" + defaultLang, "utf-8"), bytes("l_" + lang, "utf-8") )
+            writeStream(lang, stream, filename)
+            continue
 
         langStream = tr(stream)
         # print("Str document:", type(langStream), langStream)
