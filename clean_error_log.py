@@ -37,7 +37,7 @@ text_to_remove_list = [
 ]
 # very specific one-liner
 text_first_remove_list = [
-    "failed to generate a ship class name for ship size", # ?
+  "failed to generate a ship class name for ship size", # ?
 ]
 
 
@@ -55,7 +55,7 @@ if logs_path is None or logs_path == '':
 def remove_lines_with_first_hit(filename, text_to_remove_list):
   """Removes only the first occurrence of any text from the provided list from each line in a file.
   """
-  with open(filename, "r") as f:
+  with open(filename, "r", encoding="utf-8", errors='replace') as f:
     lines = f.readlines()
 
   # Iterate through lines and remove the first occurrence of any text from the list
@@ -67,20 +67,20 @@ def remove_lines_with_first_hit(filename, text_to_remove_list):
 
 
   # Write the filtered lines back to the file
-  with open(filename, "w") as f:
+  with open(filename, "w", encoding="utf-8", errors='replace') as f:
     f.writelines(lines)
 
 def remove_lines_with_text(filename, text_to_remove_list):
 
   """Removes lines from a file that contain any of the specified texts.
   """
-  with open(filename, "r") as f:
+  with open(filename, "r", encoding="utf-8", errors='replace') as f:
     lines = f.readlines()
   filtered_lines = [
       line for line in lines if all(text not in line for text in text_to_remove_list)
   ]
 
-  with open(filename, "w") as f:
+  with open(filename, "w", encoding="utf-8", errors='replace') as f:
     # f.writelines(filtered_lines)
     for line in filtered_lines:
       # print(line)
