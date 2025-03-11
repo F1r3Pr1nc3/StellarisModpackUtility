@@ -549,7 +549,8 @@ if not load_vanilla_loc or not isinstance(load_vanilla_loc, dict):
 
 # CrisisManagerEvent_l_english ,'**'
 
-trimDupe = re.compile(r'^\$?([^$]+)\$?$')
+trimDupe = re.compile(r"^\$?\"?([^$]+?)\"?\$?$")
+# trimDupe = re.compile(r"^\$?([^$]+)\$?$")
 trimEnd = re.compile(r"[.!?]\s*$")
 for filename in YML_FILES:
     print("Open file:", filename)
@@ -591,6 +592,8 @@ for filename in YML_FILES:
                 and v.count("$", 1, -3) == 0
             ):
                 replaceLoc(k, trimDupe.sub(r'"\1"', v), yml_doc)
+            elif v == "" and k.endswith("tooltip"):
+                replaceLoc(k, '""', yml_doc)
 
     # Replace with Vanilla
     if load_vanilla_loc and isinstance(yml_doc, dict):
