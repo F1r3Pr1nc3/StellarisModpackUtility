@@ -8,7 +8,7 @@ and handling various localization-related tasks.
 """
 
 ###    @author FirePrince
-###    @revision 2025/16/02
+###    @revision 2025/11/03
 ###
 ###    USAGE: You need install https://pyyaml.org/wiki/PyYAMLDocumentation for Python3.x
 ###    ATTENTION: You still must customize the mod path at localModPath (and optionally the languages which should be overhauled)
@@ -42,11 +42,11 @@ except:
 
 # ============== Initialize global variables ===============
 # Variables
-optimize_loc = True  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
+optimize_loc = False  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
 optimize_loc_string = "sleeper"  # only used if optimize_loc is True
 
-load_vanilla_loc = True  # True BETA: replaces exact matching strings with vanilla ones
-load_vanilla_loc_update_default = True  # only usable if load_vanilla_loc
+load_vanilla_loc = False  # True BETA: replaces exact matching strings with vanilla ones
+load_vanilla_loc_update_default = False  # only usable if load_vanilla_loc
 
 # Constants
 # loadDependingMods = False # replaces exact matching strings with ones from the depending mod(s)
@@ -78,29 +78,29 @@ localModPath = ["e:/lovelydemons_3.9", ["german", "spanish", "braz_por", "french
 localModPath = ["New Job Manager", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["c:\\Users\\Max\\Documents\\Paradox Interactive\\Stellaris\\mod\\WH_species_patch", ["german", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["distant_stars_overhaul", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
 localModPath = ["Rise and Fall", ["english"]]
 localModPath = ["Special Project Extended", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish", "korean"]]
 localModPath = ["Adeptus Mechanicus Addon", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["CrimsonThrong", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"]]
 localModPath = ["Counter-Limited Armies Fix", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["TheGreatKhanExpanded", []]
-localModPath = ["ADeadlyTempest", ["polish", "korean"]]
 localModPath = ["FATALF", ["english"]]
 localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Destiny", ["english"]]
 localModPath = ["Daemonic_Incursion", []]
 localModPath = ["Species Engineering", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Ad Astra Technology", ["german", "spanish", "braz_por", "french", "polish", "japanese", "korean"], ["gort"]]
-localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"], ["constructible_l-gate", "l-cluster_access"]]  # , "korean" partial
 localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"], ["unrest_legacy"]]
 localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Loud But Deadly", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["Potent_Rebellions", ["braz_por", "polish"], ["unrest_legacy"]]
 localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-
+localModPath = ["Potent_Rebellions", ["braz_por"], ["unrest_legacy"]]
+localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish"]]
+localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
+localModPath = ["ADeadlyTempest", ["polish", "korean"]]
+localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"], ["constructible_l-gate", "l-cluster_access"]]  # , "korean" partial
+localModPath = ["The Wandering Ghost", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
+localModPath = ["TheGreatKhanExpanded", []]
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
 # local_OVERHAUL = ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]
@@ -115,7 +115,6 @@ elif len(localModPath) == 3:
 # mods_registry = "mods_registry.json" # old launcher (changed in 2.7.2)
 mods_registry = "settings.txt"
 localizations = ["english", "german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]  # , "italian"
-
 
 # old, new = string
 def replaceLoc(old, new, yml_doc):
@@ -173,7 +172,6 @@ def replaceLoc(old, new, yml_doc):
                             f.write(s)
                             print(f"REPLACED {old} with {new}")
 
-
     if has_changed and optimize_loc_string in old.lower() and old in yml_doc and all(s not in old for s in EXC_LOC_STRINGS):
         for k, v in yml_doc.items():
             # if old_re in v:
@@ -217,7 +215,6 @@ def tr(s):
     # s = re.sub(r':\d "+', ': "', s, flags=re.M|re.ASCII)
     return s
 
-
 def getYAMLstream(lang, filename):
     "Read YAML file"
     if lang != DEFAULT_LANG:
@@ -227,7 +224,6 @@ def getYAMLstream(lang, filename):
     if os.path.isfile(lang):
         return io.open(lang, "rb")  # encoding='utf-8-sig'
         # return io.open(lang, 'r', encoding='utf-8-sig')  # Read file content as a string
-
 
 if load_vanilla_loc and len(local_OVERHAUL) > 0:
     import tempfile
@@ -369,7 +365,6 @@ if load_vanilla_loc and len(local_OVERHAUL) > 0:
 #   mBox('abort', message, 0)
 #   sys.exit(1)
 
-
 def mBox(mtype, text):
     """
     Displays a message box with a specified type and text.
@@ -394,7 +389,6 @@ def mBox(mtype, text):
     )
     style(title=mtype, message=text)
 
-
 def iBox(title, prefil):  # , master
     """
     Opens a directory selection dialog and returns the selected directory path.
@@ -412,7 +406,6 @@ def iBox(title, prefil):  # , master
         # parent=master
     )
     return answer
-
 
 # default needs first
 if DEFAULT_LANG != localizations[0]:
@@ -469,7 +462,6 @@ if optimize_loc:
 localModPath = os.path.join(settingsPath, "mod", localModPath, "localisation")
 os.chdir(localModPath)
 
-
 regRev1 = re.compile(
     r'^ +\"([^:"\s]+)\": ', re.MULTILINE
 )  # remove quote marks from keys
@@ -482,7 +474,6 @@ if os.path.exists(DEFAULT_LANG):
 else:
     YML_FILES = glob.iglob("*l_" + DEFAULT_LANG + ".yml", recursive=False)
     no_subfolder = True
-
 
 def trReverse(s):
     "Paradox workaround"
@@ -499,7 +490,6 @@ def trReverse(s):
     # s = s.replace("…", ':')
     # s = re.sub(regRev2, r'\1"', s)
     return s
-
 
 def writeStream(lang, stream, filename):
     "Write YAML file"
@@ -528,7 +518,6 @@ def writeStream(lang, stream, filename):
     with io.open(lang, "w", encoding="utf-8-sig") as f:
         f.write(stream)
         # yaml.dump(stream, f, indent=1)
-
 
 # BOM = codecs.BOM_UTF8 # u'feff'
 # def testYAML_BOM(text):
@@ -594,7 +583,13 @@ for filename in YML_FILES:
     # First just replace own double inclusions
     if optimize_loc and isinstance(yml_doc, dict):
         for k, v in yml_doc.copy().items():
-            if v.startswith("$") and v.endswith("$") and len(v) < 60:
+            if (
+                len(v) > 2
+                and v.startswith("$")
+                and v.endswith("$")
+                and len(v) < 60
+                and v.count("$", 1, -3) == 0
+            ):
                 replaceLoc(k, trimDupe.sub(r'"\1"', v), yml_doc)
 
     # Replace with Vanilla
@@ -636,7 +631,6 @@ for filename in YML_FILES:
                     elif optimize_loc: # also own duplicates
                         load_vanilla_loc[k] = v
 
-
         if has_changed and load_vanilla_loc_update_default:
             load_vanilla_loc_update_default = True
             localizations.append(DEFAULT_LANG)
@@ -646,10 +640,9 @@ for filename in YML_FILES:
 
     if optimize_loc and isinstance(yml_doc, dict):
         print("optimize Loc")
-        # docCopy = yml_doc.copy()
         for k, v in yml_doc.copy().items():
-            # if len(v) < 4:
-            #     continue
+            if len(v) < 3:
+                continue
             if (
                 v.startswith("$")
                 and v.endswith("$")
@@ -731,7 +724,6 @@ for filename in YML_FILES:
                 continue
         else:
             print(rawFilename, "in", EXC_FILES)
-
 
         stream = getYAMLstream(lang, filename)
         if stream:
