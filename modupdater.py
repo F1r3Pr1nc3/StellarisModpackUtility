@@ -28,7 +28,7 @@ code_cosmetic = 0
 also_old = 0
 debug_mode = 0  # without writing file=log_file
 mergerofrules = 0 # TODO auto detect?
-keep_default_country_trigger = 1
+keep_default_country_trigger = 0
 output_log = 0  # TODO
 
 # Print available options and descriptions if /? or --help is provided
@@ -233,35 +233,44 @@ actuallyTargets = {
 	"targets4": {},  # Multiline syntax # key (pre match without group or one group): arr (search, replace) or str (if no group or one group) # re flags=re.I|re.M|re.A
 }
 
-
-v3_14 = {
+v4_00 = {
 	"targetsR": [
+		r"^\s+[^#]*?\bclear_pop_category\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bcreate_half_species\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bevery_galaxy_pop\b", "Removed in v4.00",
+		r"^\s+[^#]*?\b(%s)_pop\b" % vanilla_prefixes, "Removed in v4.00",
+		r"^\s+[^#]*?\bremove_last_built_(building|district)\b", "Removed in v4.00",
+		r"^\s+[^#]*?\breset_decline\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bcan_work_job\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bcount_owned_pops\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bhas_collected_system_trade_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bhas_system_trade_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bhas_trade_route\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bnum_trade_routes\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_income\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_intercepted_percentage\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_intercepted_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_protected_percentage\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_protected_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrade_route_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\btrading_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bhas_uncollected_system_trade_value\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bis_half_species\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bis_unemployed\b", "Removed in v4.00",
+		r"^\s+[^#]*?\bnum_(sapient_)?pops\b", "Removed in v4.00",
 	],
 	"targets3": {
+		r"\b(%s)_species_pop\b" % vanilla_prefixes:  r"\1_species_pop_group",
 	},
 	"targets4": {
-		r"\bN?O[RT] = \{\s*(?:pop_has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
-			r"(N)?O[RT] = \{\s*(?:pop_has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
-			lambda p: "is_robot_pop = " + ("no" if p.group(1) else "yes")
-		)],
-		r"\bany_owned_pop = \{\s*is_robot(?:_pop|ic) = (?:yes|no)\s*\}": [
-			r"any_owned_pop = \{\s*is_robot(?:_pop|ic)  = (yes|no)\s*\}", (no_trigger_folder, r"any_owned_species = { is_robotic = \1 }")],
-		r"\bset_faction_hostility = \{\s*(?:target = [\d\w\.:]+)?(?:\s+set_(?:hostile|neutral|friendly) = (?:yes|no)){3}\s*(?:target = [\d\w\.:]+)?\s*\}": [
-			r"\s+(?:\w+ = no\s+){0,2}(set_(?:hostile|neutral|friendly) = yes)\s*?(?:\w+ = no\s+){0,2}\s*(target = [\d\w\.:]+)?\s*\}",
-			lambda p: " " + p.group(1) + " " + (p.group(2) + " }" if p.group(2) else "}")],
-		r"\bN?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
-			r"(N)?O[RT] = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
-			lambda p: "is_robotic = " + ("no" if p.group(1) else "yes")
-		)],
-		r"\bwhile = \{\s*count = \d+\s+create_pop = \{\s*species = [\d\w\.:]+(?:\s*ethos = (?:[\d\w\.:]+|\{\s*ethic = \w+(?:\s+ethic = \w+)?\s*\})|\s*)\s*\}\s*\}": [ # TODO count with vars needs to be tested
-			r"while = \{\s*(count = \d+)\s+create_pop = \{\s*(species = [\d\w\.:]+)(\s*ethos = (?:[\d\w\.:]+|\{\s*ethic = \w+(?:\s+ethic = \w+)?\s*\})|\s*)\s*\}\s*\}", r"create_pop = { \2 \1\3 }"],
+
 	},
 }
 
 v3_13 = {
 	"targetsR": [
-		# [r"^\s+[^#]*?\bhas_authority\b", "Replaced in v.3.13 with scripted trigger"]
-		[r"^\s*?[^#]+\s+\b(?:%s)_(?:system|galaxy_(?:fleet|planet|pop))\b" % vanilla_prefixes, "this is a global command"]
+		# [r"^\s+[^#]*?\bhas_authority\b", "Replaced in v3.13 with scripted trigger"]
+		[r"^\s*?[^#]+\s+\b(?:%s)_(?:system|galaxy_(?:fleet|planet|pop))\b" % "every|count|ordered", "this is a global command"] # vanilla_prefixes
 	],
 	"targets3": {
 		r"\bhas_authority = (\"?)auth_(imperial|democratic|oligarchic|dictatorial)\1\b":  (no_trigger_folder, r"is_\2_authority = yes"),
@@ -274,7 +283,28 @@ v3_13 = {
 		r"\bany_owned_pop = \{\s*is_enslaved = (?:yes|no)\s*\}": [
 			r"any_owned_pop = \{\s*is_enslaved = (yes|no)\s*",
 			lambda p: "count_enslaved_species = { count " + {"yes": ">", "no": "="}[p.group(1)] + " 0 "
-		]
+		],
+		r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:pop_has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
+			r"(N)?O[RT] = \{\s*(?:pop_has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
+			lambda p: "is_robot_pop = " + ("no" if p.group(1) else "yes")
+		)],
+		r"\bany_owned_pop = \{\s*is_robot(?:_pop|ic) = (?:yes|no)\s*\}": [
+			r"any_owned_pop = \{\s*is_robot(?:_pop|ic)  = (yes|no)\s*\}", (no_trigger_folder, r"any_owned_species = { is_robotic = \1 }")],
+		r"\bset_faction_hostility = \{\s*(?:target = [\d\w\.:]+)?(?:\s+set_(?:hostile|neutral|friendly) = (?:yes|no)){3}\s*(?:target = [\d\w\.:]+)?\s*\}": [
+			r"\s+(?:\w+ = no\s+){0,2}(set_(?:hostile|neutral|friendly) = yes)\s*?(?:\w+ = no\s+){0,2}\s*(target = [\d\w\.:]+)?\s*\}",
+			lambda p: " " + p.group(1) + " " + (p.group(2) + " }" if p.group(2) else "}")],
+		r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
+			r"\b(NO[RT]|OR) = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
+			lambda p: "is_robotic = " + ("no" if p.group(1) else "yes")
+		)],
+		# Just works in species scope but is_species_class works also in country scope?
+		# r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:(?:is_species_class = (?:ROBOT|MACHINE)\s*?){2}|(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2})\}": [
+		# 	r"\b(NO[RT]|OR) = \{\s*(?:(?:is_species_class = (?:ROBOT|MACHINE)\s*?){2}|(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2})\}", (no_trigger_folder,
+		# 	lambda p: f"is_robotic = {'yes' if p.group(1) == 'OR' else 'no'}"
+		# )],
+
+		r"\bwhile = \{\s*count = \d+\s+create_pop = \{\s*species = [\d\w\.:]+(?:\s*ethos = (?:[\d\w\.:]+|\{\s*ethic = \w+(?:\s+ethic = \w+)?\s*\})|\s*)\s*\}\s*\}": [ # TODO count with vars needs to be tested
+			r"while = \{\s*(count = \d+)\s+create_pop = \{\s*(species = [\d\w\.:]+)(\s*ethos = (?:[\d\w\.:]+|\{\s*ethic = \w+(?:\s+ethic = \w+)?\s*\})|\s*)\s*\}\s*\}", r"create_pop = { \2 \1\3 }"],
 	},
 }
 
@@ -286,11 +316,10 @@ is_individual_machine = { founder_species = { is_archetype = MACHINE } is_gestal
 v3_12 = {
 	"targetsR": [
 		[
-			r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b",
-			"Removed in v.3.12, added in v.3.6",
+			r"^\s+[^#]*?\bgenerate_cyborg_extra_treats\b", "Removed in v3.12, added in v3.6",
 		],
-		[r"^\s+[^#]*?\bstations_produces_mult\b", "Removed in v.3.12,"],
-		# [r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v.3.12,"],
+		[r"^\s+[^#]*?\bstations_produces_mult\b", "Removed in v3.12,"],
+		# [r"^\s+[^#]*?modifier = crucible_colony\b", "Removed in v3.12,"],
 		[
 			r"^\s+[^#]*?\bactivate_crisis_progression = yes\b",
 			"Since v.3.12 needs a crisis path",
@@ -299,7 +328,7 @@ v3_12 = {
 			["common/technology"],
 			[
 				r"^\s+[^#]*?\bresearch_leader\b",
-				"Leads to CTD in v.3.12.3! Obsolete since v.3.8",
+				"Leads to CTD in v3.12.3! Obsolete since v.3.8",
 			],
 		),
 	],
@@ -307,24 +336,16 @@ v3_12 = {
 		r"\bset_gestalt_node_protrait_effect\b": "set_gestalt_node_portrait_effect",
 		r"(\w+modifier = )crucible_colony\b": r"\1gestation_colony",
 		r"\bhas_synthethic_dawn = yes": 'host_has_dlc = "Synthetic Dawn Story Pack"',  # 'has_synthetic_dawn', enable it later for backward compat.
-		r"\bhas_origin = origin_post_apocalyptic\b": (
-			no_trigger_folder,
-			"is_apocalyptic_empire = yes",
-		),
-		r"\bhas_origin = origin_subterranean\b": (
-			no_trigger_folder,
-			"is_subterranean_empire = yes",
-		),
-		r"\bhas_origin = origin_void_dwellers\b": (
-			no_trigger_folder,
-			"has_void_dweller_origin = yes",
-		),
+		r"\bhas_origin = origin_post_apocalyptic\b": (no_trigger_folder, "is_apocalyptic_empire = yes", ),
+		r"\bhas_origin = origin_subterranean\b": (no_trigger_folder, "is_subterranean_empire = yes", ),
+		r"\bhas_origin = origin_void_dwellers\b": (no_trigger_folder, "has_void_dweller_origin = yes", ),
 		r"\btr_cybernetics_assembly_standards\b": "tr_cybernetics_augmentation_overload",
 		r"\btr_cybernetics_assimilator_crucible\b": "tr_cybernetics_assimilator_gestation",
 		r"\btr_synthetics_synthetic_age\b": "tr_synthetics_transubstatiation_synthesis",
 		r"\bactivate_crisis_progression = yes\b": "activate_crisis_progression = nemesis_path",
 		r"\@faction_base_unity\b": "@faction_base_output",
 		r"\bd_hab_nanites_1\b": "d_hab_nanites_3",
+		r"^(\s+[^#]*?)has_country_flag = cyborg_empire\b": r"\1is_cyborg_empire = yes",
 		r"\bis_(berserk_)?fallen_machine_empire\b": r"is_fallen_empire_\1machine",  # From 1.9
 		r"\bgovernment_election_years_(add|mult)\b": r"election_term_years_\1",  # 3.12.3
 	},
@@ -334,6 +355,7 @@ v3_12 = {
 			no_trigger_folder,
 			"has_synthetic_ascension = yes",
 		),
+		r"(\b(OR = \{\s+)?(?:is_artificial = yes\s+is_planet_class = pc_cosmogenesis_world|is_planet_class = pc_cosmogenesis_world\s+is_artificial = yes)(?(2)\s+\}))": r"is_artificial = yes",
 	},
 }
 if code_cosmetic and not only_warning:
@@ -363,10 +385,10 @@ v3_11 = {
 	"targetsR": [
 		[
 			r"^\s+[^#]*?\btech_(society|physics|engineering)_\d",
-			"Removed in v.3.11 after having their function made redundant",
+			"Removed in v3.11 after having their function made redundant",
 		],
-		# [r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in v.3.11"], ??
-		[r"^\s+[^#]*?\bstation_uninhabitable_category", "Removed in v.3.11"],
+		# [r"^\s+[^#]*?\bplanet_researchers_upkeep_mult", "Removed in v3.11"], ??
+		[r"^\s+[^#]*?\bstation_uninhabitable_category", "Removed in v3.11"],
 	],
 	"targets3": {
 		r"\bgive_next_tech_society_option_effect = yes": "give_next_breakthrough_effect = { AREA = society }",
@@ -424,13 +446,13 @@ v3_10 = {
 	"targetsR": [
 		[
 			r"^[^#]+?\w+(skill|weight|agent|frontier)_governor\b",
-			"Possibly renamed to '_official' in v.3.10",
+			"Possibly renamed to '_official' in v3.10",
 		],
-		# [r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in v.3.10 (planet, country)"], # Not really recommended: needs to be more accurate
-		[r"^[^#]+?\s+trait_ruler_(explorer|world_shaper)", "Removed in v.3.10"],  # TODO
+		# [r"^[^#]+?\s+num_pops\b", "Can be possibly replaced with 'num_sapient_pops' in v3.10 (planet, country)"], # Not really recommended: needs to be more accurate
+		[r"^[^#]+?\s+trait_ruler_(explorer|world_shaper)", "Removed in v3.10"],  # TODO
 		[
 			r"^[^#]+?\s+leader_trait_inspiring",
-			"Removed in v.3.10, possible replacing by leader_trait_crusader",
+			"Removed in v3.10, possible replacing by leader_trait_crusader",
 		],  # TODO: needs to be more accurate
 		[
 			r"\s+kill_leader = \{ type",
@@ -438,27 +460,27 @@ v3_10 = {
 		],  # TODO: needs to be more accurate
 		(
 			["common/traits"],
-			[r"^[^#]+?\bai_categories", "Replaced in v.3.10 with 'inline_script'"],
+			[r"^[^#]+?\bai_categories", "Replaced in v3.10 with 'inline_script'"],
 		),
 		(
 			["common/traits"],
 			[
 				r"^[^#]+?\b(?:is_)?councilor_trait",
-				"Replaced in v.3.10 with 'councilor_modifier' or 'force_councilor_trait = yes'",
+				"Replaced in v3.10 with 'councilor_modifier' or 'force_councilor_trait = yes'",
 			],
 		),
 		(
 			["common/traits"],
 			[
 				r"^[^#]+?\bselectable_weight = @class_trait_weight",
-				"Replaced in v.3.10 with inline_script'",
+				"Replaced in v3.10 with inline_script'",
 			],
 		),
 		(
 			["common/traits", "common/governments/councilors"],
 			[
 				r"^\s+leader_class = \{\s*((?:admiral|general|governor)\s+){1,2}",
-				"Needs to be replaced with 'official' or 'commander' in v.3.10",
+				"Needs to be replaced with 'official' or 'commander' in v3.10",
 			],
 		),  # TODO
 	],
@@ -547,12 +569,13 @@ v3_10 = {
 
 v3_9 = {
 	"targetsR": [
-		[r"^[^#]+?\sland_army\s", "Removed army parameter from v.3.8 in v.3.9:", ],  # only from 3.8
-		[r"^[^#]+?\bhabitat_0\s", "Removed in v.3.9: replaceable with 'major_orbital'", ],  # only from 3.8
-		[r"^[^#]+?\sdistrict_hab_cultural", "Removed in v.3.9: replaceable with 'district_hab_housing'?", ],
-		[r"^[^#]+?\sdistrict_hab_commercial", "Removed in v.3.9: replaceable with 'district_hab_energy'?", ],
-		[r"^[^#]+?\sis_regular_empire_or_primitive\b", "Removed in v.3.9.0 from 3.6: replaceable with OR = { is_regular_empire is_primitive = yes }?", ],  # only from 3.8
-		[r"^[^#]+?\sis_space_critter_country_type\b", "Removed in v.3.9.2: possible replaceable with 'is_non_hostile_to_wraith'?", ],  # only from 3.8
+		# [r"^[^#]+?\sland_army\s", "Removed army parameter from v3.8 in v3.9:", ],  # only from 3.8
+		# [r"^[^#]+?\bhabitat_0\s", "Removed in v3.9: replaceable with 'major_orbital'", ],  # only from 3.8
+		[r"^[^#]+?\sdistrict_hab_cultural", "Removed in v3.9: replaceable with 'district_hab_housing'?", ],
+		[r"^[^#]+?\sdistrict_hab_commercial", "Removed in v3.9: replaceable with 'district_hab_energy'?", ],
+		[r"^[^#]+?\scol_habitat_leisure", "Removed in v3.9", ],
+		[r"^[^#]+?\sis_regular_empire_or_primitive\b", "Removed in v3.9.0 from 3.6: replaceable with OR = { is_regular_empire is_primitive = yes }?", ],  # only from 3.8
+		[r"^[^#]+?\sis_space_critter_country_type\b", "Removed in v3.9.2: possible replaceable with 'is_non_hostile_to_wraith'?", ],  # only from 3.8
 	],
 	"targets3": {
 		# r'\bhabitat_0\b': 'major_orbital', # 'habitat_central_complex',
@@ -570,16 +593,16 @@ v3_9 = {
 # Galactic Paragons
 v3_8 = {
 	"targetsR": [
-		# [r"^[^#]+?\ssector(?:\.| = \{ )leader\b", "Removed in v.3.8: replaceable with planet?"],
-		[r"^[^#]+?\sclass = ruler\b", "Removed in v.3.8: replaceable with ?"],
+		# [r"^[^#]+?\ssector(?:\.| = \{ )leader\b", "Removed in v3.8: replaceable with planet?"],
+		[r"^[^#]+?\sclass = ruler\b", "Removed in v3.8: replaceable with ?"],
 		[
 			r"^[^#]+?\sleader_of_faction = [^\s]+",
-			"Removed in v.3.8: replaceable with ?",
+			"Removed in v3.8: replaceable with ?",
 		],
-		[r"^[^#]+?\shas_mandate = [^\s]+", "Removed in v.3.8: replaceable with ?"],
-		[r"^[^#]+?\spre_ruler_leader_class =", "Removed in v.3.8: replaceable with ?"],
-		[r"^[^#]+?\sruler_skill_levels =", "Removed in v.3.8: replaceable with ?"],
-		# [r"^[^#]+?\shas_chosen_trait_ruler =", "Replaced in v.3.8.3 with 'has_chosen_one_leader_trait'"],
+		[r"^[^#]+?\shas_mandate = [^\s]+", "Removed in v3.8: replaceable with ?"],
+		[r"^[^#]+?\spre_ruler_leader_class =", "Removed in v3.8: replaceable with ?"],
+		[r"^[^#]+?\sruler_skill_levels =", "Removed in v3.8: replaceable with ?"],
+		# [r"^[^#]+?\shas_chosen_trait_ruler =", "Replaced in v3.8.3 with 'has_chosen_one_leader_trait'"],
 		# [r"^[^#]+?\sis_specialist_researcher =", "Replaced trigger 3.8: is_specialist_researcher_(society|engineering|physics)"], scripted trigger now
 	],
 	"targets3": {
@@ -658,7 +681,6 @@ v3_8 = {
 		r"\s*[^#]*?\bis_researching_area = \w+": "",
 		# r"\s+traits = \{\s*\}\s*": "",
 		r"\bmerg_is_standard_empire = (yes|no)": r"is_default_or_fallen = \1",  # v3.8 former merg_is_standard_empire Merger Rule now vanilla
-		# r"\bspecies = \{ has_trait = trait_hive_mind \}": r'is_hive_species = yes',
 	},
 	"targets4": {
 		r"\s+traits = \{\s*\}": "",
@@ -693,8 +715,9 @@ v3_8 = {
 			r"\b((?:is_country_type = default|merg_is_default_empire = yes|is_fallen_empire = yes|is_country_type_with_subjects = yes)(\s+)){2,}",
 			(no_trigger_folder, r"is_default_or_fallen = yes\2"),
 		],
+		# r"\bspecies = \{ has_trait = trait_hive_mind \}": r'is_hive_species = yes',
 		r"(\t?(?:species|pop) = \{\s+(?:limit = \{\s+)?(NOT = \{\s*)?has_trait = trait_hive_mind\s*\}(?(2)\s*\}))": [
-			r"((\t?)(?:species|pop) = \{\s*?(limit = \{)?(\s+))(NOT = \{\s*)?has_trait = trait_hive_mind\s*\}((?(4)\s*\}))",
+			r"((\t?)(?:species|pop) = \{\s*?(limit = \{)?(\s+))(NOT = \{\s*)?has_trait = trait_hive_mind\s*\}((?(4)\s*\}))", (no_trigger_folder, 
 			lambda p: p.group(2)
 			+ (
 				p.group(1)
@@ -707,7 +730,7 @@ v3_8 = {
 				p.group(6)
 				if (p.group(3) and p.group(6) or not p.group(2) or len(p.group(2)) == 0)
 				else ""
-			),
+			)),
 		],
 	},
 }
@@ -718,13 +741,13 @@ v3_7 = {
 	"targetsR": [
 		[
 			r"^\s+[^#]*?\bid = primitive\.\d",
-			"Removed in v.3.7: replaceable with 'preftl.xx' event",
+			"Removed in v3.7: replaceable with 'preftl.xx' event",
 		],
-		[r"^\s+[^#]*?\bremove_all_primitive_buildings =", "Removed in v.3.7:"],
-		[r"^\s+[^#]*?\buplift_planet_mod_clear =", "Removed in v.3.7:"],
+		[r"^\s+[^#]*?\bremove_all_primitive_buildings =", "Removed in v3.7:"],
+		[r"^\s+[^#]*?\buplift_planet_mod_clear =", "Removed in v3.7:"],
 		[
 			r"^\s+[^#]*?\bcreate_primitive_armies =",
-			"Removed in v.3.7: done via pop job now",
+			"Removed in v3.7: done via pop job now",
 		],
 	],
 	"targets3": {
@@ -754,15 +777,15 @@ v3_6 = {
 	"targetsR": [
 		[
 			r"^\s+[^#]*?\bhas_ascension_perk = ap_transcendence\b",
-			"Removed in v.3.6: can be replaced with 'has_tradition = tr_psionics_finish'",
+			"Removed in v3.6: can be replaced with 'has_tradition = tr_psionics_finish'",
 		],
 		[
 			r"^\s+[^#]*?\bhas_ascension_perk = ap_evolutionary_mastery\b",
-			"Removed in v.3.6: can be replaced with 'has_tradition = tr_genetics_resequencing'",
+			"Removed in v3.6: can be replaced with 'has_tradition = tr_genetics_resequencing'",
 		],
 		[
 			r"^\s+[^#]*?\btech_genetic_resequencing\b",
-			"Replaced in v.3.6: with 'tr_genetics_resequencing'",
+			"Replaced in v3.6: with 'tr_genetics_resequencing'",
 		],
 	],
 	"targets3": {
@@ -1430,7 +1453,7 @@ actuallyTargets = {
 		r"(?<![ \t]OR)\s+=\s*\{\s(?:[^{}#\n]+\n)*(?:\s+NO[RT] = \{\s*[^{}#]+?\s*\}){2,}": [
 			r"(\n\s+)NO[RT] = \{\1(\s+)([^{}#]+?)\s+\}\s+NO[RT] = \{\s*([^{}#]+?)\s+\}",
 			r"\1NOR = {\1\2\3\1\2\4\1}",
-		],  # only 2 items (sub-trigger) (?<!\sOR) Negative Lookbehind
+		],  # only 2 items (sub-trigger) (?<!\sOR) Negative Look-behind
 		# NAND <=> NOT = { AND
 		r"\n\s+NO[RT] = \{\s*AND = \{[^{}#]*?\}\s*\}": [
 			r"(\t*)NO[RT] = \{\s*AND = \{[ \t]*\n(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?\s*\}[ \t]*\n",
@@ -1541,11 +1564,14 @@ elif only_upto_version == "3.10":
 	only_upto_version = 3.95  # exception
 only_upto_version = float(only_upto_version)
 
-
-if only_upto_version >= 3.99:
+if only_upto_version > 3.99:
+	actuallyTargets["targetsR"].extend(v4_00["targetsR"])
+	actuallyTargets["targets3"].update(v4_00["targets3"])
+	actuallyTargets["targets4"].update(v4_00["targets4"])
+# if only_upto_version >= 3.99:
 	# actuallyTargets["targetsR"].extend(v3_14["targetsR"])
 	# actuallyTargets["targets3"].update(v3_14["targets3"])
-	actuallyTargets["targets4"].update(v3_14["targets4"])
+	# actuallyTargets["targets4"].update(v3_14["targets4"])
 if only_upto_version >= 3.98:
 	actuallyTargets["targetsR"].extend(v3_13["targetsR"])
 	actuallyTargets["targets3"].update(v3_13["targets3"])
@@ -1671,19 +1697,8 @@ if also_old:
 	# tmp fix
 	# targets3[r"\bhas_resource = \{ type = (%s) amount( = (?:\d+|@\w+)) \}" % resource_items] = (["common/scripted_triggers", "common/scripted_effects", "events"], r"\1\2 ")
 
-if not keep_default_country_trigger:
-	targets4[
-		r"\s(?:%s)_playable_country = \{[^{}#]*(?:limit = \{\s+)?(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % vanilla_prefixes] = [
-		r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % vanilla_prefixes, r"\1",
-	]
-	# without is_country_type_with_subjects & without is_fallen_empire = yes
-	targets4[
-		r"\b(?:(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes))|(?:(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = default|merg_is_default_empire = yes))|(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)))"
-	] = [
-		r"\b((?:is_country_type = default|merg_is_default_empire = yes|is_country_type = fallen_empire|merg_is_fallen_empire = yes|is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)(\s+)){2,}",
-		(no_trigger_folder, r"is_default_or_fallen = yes\2"),
-	]
-elif not mergerofrules:
+
+if not mergerofrules:
 	targets3[r"\bmerg_is_default_empire = (yes|no)"] = lambda p: {
 		"yes": "is_country_type = default",
 		"no": "NOT = { is_country_type = default }",
@@ -1700,15 +1715,23 @@ elif not mergerofrules:
 	}[
 		p.group(1)
 	]  # Compare vanilla is_valid_fallen_empire_for_task
+elif not keep_default_country_trigger:
+	targets4[
+		r"\s(?:%s)_playable_country = \{[^{}#]*(?:limit = \{\s+)?(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % vanilla_prefixes] = [
+		r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % vanilla_prefixes, r"\1",
+	]
+	# without is_country_type_with_subjects & without is_fallen_empire = yes
+	targets4[
+		r"\b(?:(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes))|(?:(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = default|merg_is_default_empire = yes))|(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)))"
+	] = [
+		r"\b((?:is_country_type = default|merg_is_default_empire = yes|is_country_type = fallen_empire|merg_is_fallen_empire = yes|is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)(\s+)){2,}",
+		(no_trigger_folder, r"is_default_or_fallen = yes\2"),
+	]
 
 if code_cosmetic and not only_warning:
 	triggerScopes = r"limit|trigger|any_\w+|leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+"
-	targets3[
-		r"((?:[<=>]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+)\b"
-	] = lambda p: p.group(1).lower()
-	targets3[r"\b(IF|ELSE|ELSE_IF|OWNER|Owner|CONTROLLER|Controller|LIMIT) ="] = (
-		lambda p: p.group(1).lower() + " ="
-	)
+	targets3[r"((?:[<=>]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+)\b" ] = lambda p: p.group(1).lower()
+	targets3[r"\b(IF|ELSE|ELSE_IF|OWNER|Owner|CONTROLLER|Controller|LIMIT) ="] = lambda p: p.group(1).lower() + " ="
 	targets3[r"\b(or|not|nor|and) ="] = lambda p: p.group(1).upper() + " ="
 	targets3[r" {4}"] = r"\t"  # r" {4}": r"\t", # convert space to tabs
 	targets3[r"^(\s+)limit = \{\s*\}"] = r"\1# limit = { }"
@@ -1739,7 +1762,7 @@ if code_cosmetic and not only_warning:
 				"Overlord": "overlord_dlc",
 				"Plantoids Species Pack": "plantoids",
 				"Plantoid": "plantoids",
-				"Synthetic Dawn Story Pack": "synthetic_dawn", # enable it later - changed in v.3.12
+				"Synthetic Dawn Story Pack": "synthetic_dawn", # enable it later - changed in v3.12
 				"Toxoids Species Pack": "toxoids",
 				"First Contact Story Pack": "first_contact_dlc",
 				"Galactic Paragons": "paragon_dlc",
@@ -1780,6 +1803,7 @@ if code_cosmetic and not only_warning:
 		r"\1 = { type = \2 country = prev.owner }"  # NOT SURE
 	)
 	targets3[r"\bNOT = \{\s*has_valid_civic\b"] = "NOT = { has_civic"
+	targets3[r"\bowner_main_species\b"] = "owner_species"
 	targets3[
 		re.compile(
 			r"\bNO[RT] = \{\s*((?:leader|owner|controller|PREV|FROM|ROOT|THIS|event_target:\w+) = \{)\s*([^\s]+) = yes\s*\}\s*\}",
@@ -1826,7 +1850,7 @@ if code_cosmetic and not only_warning:
 		r"\1\2\3\4\5\6\7 }",
 	]  # 6 items
 	### 3.4
-	targets4[r"\bN?O[RT] = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [
+	targets4[r"\s(?:\bNO[RT]|\bOR) = \{\s*has_modifier = doomsday_\d[\w\s=]+\}"] = [
 		r"(N)?O[RT] = \{\s*(has_modifier = doomsday_\d\s+){5}\}",
 		lambda p: "is_doomsday_planet = " + ("yes" if not p.group(1) or p.group(1) == "" else "no"),
 	]
@@ -1863,11 +1887,11 @@ if code_cosmetic and not only_warning:
 		+ "_machine_age = yes",
 	]
 	targets4[r"\n\w+_event = \{\n\s*#[^\n]+"] = [r"(\n\w+_event = \{)\n    (#[^\n]+)", ("events", r"\n\2\1")]
-	targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 limit = {\2} count = 0 }"
+	targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 count = 0 limit = {\2} }"
 	targets3[r"\bany(_\w+ = {)\s*\}"] = r"count\1 count > 0 }"
 	targets4[r"\bexists = owner\s+can_generate_trade_value = yes"] = "can_generate_trade_value = yes"
 	targets4[r"\bfederation = \{\s+any_member = \{\s+[^{}#]+\s+\}"] = [r"\bfederation = \{\s+any_member = \{\s+([^{}#]+)\s+\}", r"any_federation_ally = { \1"]
-	targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}", r"\1count\5\2limit = {\6}\2count = 0\3\4}" ]
+	targets4[r"(\n(\s+)NOT = \{\s+any_\w+ = {[^#]+?(?:\2|\s)\}\n?\2\})\n"] = [r"^(\s+)NOT = \{((\1)\s|(\s))any(_\w+ = {)([^#]+)\}(?:\1|\s)\}", r"\1count\5\2count = 0 limit = {\6}\2\3\4}" ]
 	targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
 	# targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value [<=>]+ \d+\s+\}"] = [ r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value ([<=>]+ \d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }" ]
 
@@ -1892,16 +1916,9 @@ if code_cosmetic and not only_warning:
 		),
 	]  # NAND = {\1\2\4yes\1\6\8yes
 
-	# is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes TODO
+	targets4[r"\b(?:NO[TR] = \{(?:\s+has_trait = trait_(?:hive_mind|mechanical|machine_unit)){3}\s+\})"] = (no_trigger_folder, "is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes")
+	#  TODO
 	# is_robot_pop = no
-	# is_hive_species = no
-	# species = {
-	#   NOR = {
-	#       has_trait = trait_mechanical
-	#       has_trait = trait_machine_unit
-	#       has_trait = trait_hive_mind
-	#   }
-	# }
 
 # BETA WIP still only event folder
 # like targets3 but later
@@ -1942,9 +1959,7 @@ if mergerofrules:
 	targets4[
 		r"\b(?:is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\s*?){5}"
 	] = (no_trigger_folder, "is_endgame_crisis = yes")
-	targets4[
-		r"\b(?:(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\s*?){2,3}"
-	] = (no_trigger_folder, "is_endgame_crisis = yes")
+	targets4[r"\b(?:(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\s*?){2,3}" ] = (no_trigger_folder, "is_endgame_crisis = yes")
 
 	if not keep_default_country_trigger:
 		targets3[r"\bis_country_type = default\b"] = (no_trigger_folder, "merg_is_default_empire = yes")
@@ -2411,12 +2426,8 @@ def modfix(file_list):
 											print("\tFROM GROUP1:\n", pattern)
 									elif debug_mode:
 										print("\tFROM:\n", pattern)
-									print(
-										"# Multiline replace:\n", replace, file=log_file
-									)  # repr(
-									print(
-										"Multiline replace:\n", replace, file=sys.stdout
-									)  # repr(
+									print("# Multiline replace:\n", replace, file=log_file )
+									print("Multiline replace:\n", replace, file=sys.stdout )
 									out = out.replace(tar, replace)
 									changed = True
 								elif debug_mode:
