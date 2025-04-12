@@ -24,10 +24,10 @@ stellaris_version = only_upto_version + '.15926' # @last supported sub-version
 # Default values
 mod_path = ""
 only_warning = 0
-code_cosmetic = 0
+code_cosmetic = 1
 also_old = 0
 debug_mode = 0  # without writing file=log_file
-mergerofrules = 0 # TODO auto detect?
+mergerofrules = 1 # TODO auto detect?
 keep_default_country_trigger = 0
 output_log = 0  # TODO
 
@@ -260,7 +260,7 @@ v4_00 = {
 		r"^\s+[^#]*?\bnum_(sapient_)?pops\b", "Removed in v4.00",
 	],
 	"targets3": {
-		r"\b(%s)_species_pop\b" % vanilla_prefixes:  r"\1_species_pop_group",
+		# r"\b(%s)_species_pop\b" % vanilla_prefixes:  r"\1_species_pop_group",
 	},
 	"targets4": {
 
@@ -295,7 +295,7 @@ v3_13 = {
 			lambda p: " " + p.group(1) + " " + (p.group(2) + " }" if p.group(2) else "}")],
 		r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}": [
 			r"\b(NO[RT]|OR) = \{\s*(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2}\}", (no_trigger_folder,
-			lambda p: "is_robotic = " + ("no" if p.group(1) else "yes")
+			lambda p: "is_robotic = " + ("yes" if p.group(1) and p.group(1) == "OR" else "no")
 		)],
 		# Just works in species scope but is_species_class works also in country scope?
 		# r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:(?:is_species_class = (?:ROBOT|MACHINE)\s*?){2}|(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?\s*?){2})\}": [
@@ -1917,6 +1917,7 @@ if code_cosmetic and not only_warning:
 	]  # NAND = {\1\2\4yes\1\6\8yes
 
 	targets4[r"\b(?:NO[TR] = \{(?:\s+has_trait = trait_(?:hive_mind|mechanical|machine_unit)){3}\s+\})"] = (no_trigger_folder, "is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes")
+	targets4[r"\bcount_\w+ = \{\s+limit = \{[^#]+?\}\s+count\s*[<=>]+\s*[^{}\s]+"] = [r"(count_\w+ = \{)(\s+)(limit = \{[^#]+?\})\2(count\s*[<=>]+\s*[^{}\s]+)", r"\1\2\4\2\3"] # Put count first
 	#  TODO
 	# is_robot_pop = no
 
