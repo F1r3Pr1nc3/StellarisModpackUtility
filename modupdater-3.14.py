@@ -17,12 +17,13 @@ from collections import defaultdict
 from typing import List, Tuple
 
 # @Author: FirePrince
-# @Revision: 2025/10/04
+# @Revision: 2025/10/06
 # @Git: https://github.com/F1r3Pr1nc3/StellarisModpackUtility/blob/master/modupdater.py
 # @Helper-script - creating change-catalogue: https://github.com/F1r3Pr1nc3/Stellaris-Mod-Updater/stellaris_diff_scanner.py
 # @Forum: https://forum.paradoxplaza.com/forum/threads/1491289/
 # @thanks: OldEnt for detailed rundowns (<3.2)
 # @thanks: yggdrasil75 for cmd params
+# Hint: If apply the script new, it is recommended to run it twice.
 # @TODO: replace in *.YML ?
 
 ACTUAL_STELLARIS_VERSION_FLOAT = "3.14"  #  Should be number string
@@ -33,7 +34,7 @@ mod_path = "" # "d:/GOG Games/Settings/Stellaris/Stellaris4.1.xx_patch" # Stella
 # e.g. "c:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod\\atest\\"   "d:\\Steam\\steamapps\\common\\Stellaris"
 only_warning = 0
 only_actual = 0
-code_cosmetic = 1 # Still Beta
+code_cosmetic = 1 # Still BETA
 also_old = 0
 mergerofrules = 0 # Forced support for compatibility with The Merger of Rules (MoR)
 keep_default_country_trigger = 0
@@ -421,7 +422,7 @@ revert_v4_0 = {
 		# revert the three-specialised job_* lines back into a single job_calculator_add (if they are contiguous)
 		r"(?:\n\t+job_calculator_(?:biologist|engineer|physicist)_add = -?\d+){3}": [
 			r"(\n\t+)(job_calculator_)(?:biologist|engineer|physicist)_(add = )(-?\d+)\s+job_calculator_(?:biologist|engineer|physicist)_add = (-?\d+)\s+job_calculator_(?:biologist|engineer|physicist)_add = (-?\d+)",
-			lambda m: f"{m.group(1)}{m.group(2)}{m.group(3)}{(int(m.group(5)) + int(m.group(6)) + int(m.group(7))) // 100}"
+			lambda m: f"{m.group(1)}{m.group(2)}{m.group(3)}{(int(m.group(4)) + int(m.group(5)) + int(m.group(6))) // 100}"
 		],
 		# --- commented-out → uncomment
 		r"^((\t*?) *#\s*(pop_produces_resource = \{ type = \w+ amount [<=>]+ [^}\s]+ \}))": r"\2\3",
@@ -1806,7 +1807,7 @@ def add_code_cosmetic():
 		],
 
 		# Only for planet galactic_object
-		r"(?:(?:neighbor|rim|random|every|count|closest|ordered)_system|_planet|_system_colony|_within_border) = \{\s*?(?:limit = \{)?\s*exists = (?:space_)?owner\b": [
+		r"(?:(?:neighbor|rim|closest|%s)_system|_planet|_system_colony|_within_border) = \{\s*?(?:limit = \{)?\s*exists = (?:space_)?owner\b" % VANILLA_PREFIXES: [
 			r"exists = (?:space_)?owner", "has_owner = yes"],  # only for planet galactic_object,
 		r"_event = \{\s+id = \"[\w.]+\"": [r"\bid = \"([\w.]+)\"", ("events", r"id = \1")],  # trim id quote marks
 		# WARNING not valid if in OR: NOR <=> AND = { NOT NOT } , # only 2 items (sub-trigger),
@@ -2593,11 +2594,12 @@ def modfix(file_list, is_subfolder=False):
 
 	### --- --- --- Helper Functions --- --- --- ###
 
-	def clean_by_blanking(original_lines: list[str]) -> str:
+	def clean_by_blanking(source_code: str) -> tuple[str, list[str]]:
 		"""
 		Cleans code by replacing non-code lines with blank lines,
 		preserving the original line count.
 		"""
+		original_lines = source_code.splitlines()
 		cleaned_lines = []
 		for line in original_lines:
 			if not line.strip() or line.strip().startswith('#'):
@@ -2605,8 +2607,7 @@ def modfix(file_list, is_subfolder=False):
 			else:
 				code_part = line.split('#', 1)[0].rstrip()
 				cleaned_lines.append(code_part)
-		# if len(original_lines) != after len(cleaned_lines): logger.error(f"cleaned_code for {basename} is not matching")
-		return '\n'.join(cleaned_lines)
+		return '\n'.join(cleaned_lines), original_lines
 
 	def apply_inline_replacement(match: re.Match, replace: tuple, sr: bool ) -> List[str]:
 		"""
@@ -2624,61 +2625,174 @@ def modfix(file_list, is_subfolder=False):
 			tar = match.group(0) # whole match
 			start_char, end_char = match.span()
 
-		# print(replace, match.pattern, type(match))
+		# # 1. Find the first match TODO new_content needs to be trimmed as well
+		# match_span = replace[0].search(tar)
+		# # 2. If a match is found, get its span and perform the replacement
+		# if match_span:
+		# 	# sr = match.group(0)
+		# 	match_span = match_span.span()
+		# 	# 2. Use re.sub with count=1 to perform the complex replacement
+		# 	new_content = replace[0].sub(replace[1], tar, count=1)
+		# 	print(f"TEST match_span: {match_span}, previous_span: {(match.span())}")
+		# 	end_char = start_char + match_span[1]
+		# 	start_char += match_span[0]
+		# else:
+		# 	new_content = False
 		new_content, rt = replace[0].subn(replace[1], tar, count=1)
 		if rt != 1:
 			new_content = False
 		if new_content and (isinstance(new_content, str) and isinstance(tar, str) and tar != new_content):
+			if tar.startswith('\n'):
+				start_char += 1
+				start_col = "" # so we need no prefix
+				if new_content.startswith('\n'):
+					new_content = new_content[1:]
+			else:
+				# Find the character index of the start of the lines containing the match
+				start_col = cleaned_code.rfind('\n', 0, start_char) + 1
+				start_col = start_char - start_col # Calculate the column numbers
 			# It counts the newlines in the substring *before* the character.
 			start_line_idx = cleaned_code[:start_char].count('\n')
+
+			if tar.endswith('\n'):
+				end_char -= 1
+				end_col = "" # so we need no suffix
+			else:
+				end_col = cleaned_code.rfind('\n', 0, end_char) + 1
+				end_col = end_char - end_col # Calculate the column numbers
 			# For the end character, we look at the character just before it to get the correct line.
 			end_line_idx = cleaned_code[:end_char - 1].count('\n') if end_char > 0 else 0
-			# Find the character index of the start of the lines containing the match
-			start_of_line_char_pos = cleaned_code.rfind('\n', 0, start_char) + 1
-			end_of_line_char_pos = cleaned_code.rfind('\n', 0, end_char) + 1
-			# Calculate the column numbers
-			start_col = start_char - start_of_line_char_pos
-			end_col = end_char - end_of_line_char_pos
-			# print(f"{basename},{len(lines)},{end_line_idx}:\n{new_content}:\n{tar}\n{replace[0].pattern}")
-			# --- --- --- Preservation Block --- --- ---
-			comment_map = {}
-			# 1. Get the original lines that will be affected by the full replacement
-			original_block_lines = lines[start_line_idx : end_line_idx + 1]
-			# 2. Build a map from code to its comment
-			for line in original_block_lines:
-				if '#' in line:
-					parts = line.split('#', 1)
-					code_key = parts[0].strip()
-					if code_key:  # Only map if there's actual code on the line
-						comment_map[code_key] = line # line[len(parts[0]):] # Store the comment with its preceding whitespace and '#'
-			# 3. Process the new content to re-attach comments
-			final_content_lines = []
-			for new_line in new_content.splitlines():
-				stripped_new_line = new_line.strip()
-				if stripped_new_line in comment_map:
-					# If this new line existed before (with comment)
-					final_content_lines.append(comment_map[stripped_new_line])
-				else:
-					final_content_lines.append(new_line)
-			# Use the comment-restored lines for the replacement
-			new_content = '\n'.join(final_content_lines)
-			# --- --- --- End of Preservation Block --- --- ---
+			# print(f"{basename} lines {len(lines)} ({start_line_idx}-{end_line_idx}):\n'{tar}':\n'{new_content}'\n{replace[0].pattern}")
 			changed = True
+
 			# --- Perform the stitching ---
+			if end_col != "":
+				end_col = lines[end_line_idx][end_col:]
+			if start_col != "":
+				start_col = lines[start_line_idx][:start_col]
+
+			new_content = start_col + new_content + end_col
+
+			# --- Trim identical lines (from Start and End) FIRST by comparing cleaned versions ---
+			def clean_lines_for_comparison(line_list: List[str]) -> List[str]:
+				"Similar to clean_by_blanking"
+				cleaned = []
+				for line in line_list:
+					cleaned.append(line.split('#', 1)[0].strip())
+				return cleaned
+
+			new_content_lines = new_content.split('\n') # Start with the comment-preserved new content
+			original_block_lines = lines[start_line_idx : end_line_idx + 1]
+
+			cleaned_original_block = clean_lines_for_comparison(original_block_lines)
+			cleaned_new_block = clean_lines_for_comparison(new_content_lines)
+			# print("cleaned_original_block",cleaned_original_block)
+			# print("cleaned_new_block",cleaned_new_block)
+
+			common_prefix_len = 0
+			while (common_prefix_len < len(cleaned_original_block) and
+				   common_prefix_len < len(cleaned_new_block) and
+				   cleaned_original_block[common_prefix_len] == cleaned_new_block[common_prefix_len]):
+				common_prefix_len += 1
+				# print("common_prefix_len +",common_prefix_len)
+
+			# common_suffix_len = 0
+			# while (common_suffix_len + common_prefix_len < len(cleaned_original_block) and
+			# 	   common_suffix_len + common_prefix_len < len(cleaned_new_block) and
+			# 	   cleaned_original_block[-(common_suffix_len + 1)] == cleaned_new_block[-(common_suffix_len + 1)]):
+			# 	common_suffix_len += 1
+
+			# --- Comment Preservation Block (now operates on the smaller, trimmed blocks) ---
+			# Get the minimal blocks that actually changed
+			original_block_lines = original_block_lines[common_prefix_len : ] # len(original_block_lines)- common_suffix_len # minimal_original_block
+			new_content_lines = new_content_lines[common_prefix_len : ] # len(new_content_lines) - common_suffix_len  # minimal_new_block_lines
+			start_line_idx = start_line_idx + common_prefix_len # final_start_idx
+			# end_line_idx = end_line_idx - common_suffix_len + 1 # slice_to_remove_end_idx
+
+			# Handle the simple case first: a single-line match is purely character-based.
 			if start_line_idx == end_line_idx: # SINGLE-LINE match
-				original_line = lines[start_line_idx]
-				new_line = original_line[:start_col] + new_content + original_line[end_col:]
-				lines = lines[:start_line_idx] + [new_line] + lines[start_line_idx + 1:]
-				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n{original_line} ->\n{new_line}")
+				lines = lines[:start_line_idx] + [new_content] + lines[start_line_idx + 1:]
+				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block_lines[0]}' \u2935\n'{new_content_lines[0]}'")
 			else: # MULTI-LINE match
-				prefix = lines[start_line_idx][:start_col]
-				suffix = lines[end_line_idx][end_col:]
-				combined_content = prefix + new_content + suffix
-				lines = lines[:start_line_idx] + combined_content.splitlines() + lines[end_line_idx + 1:]
-				logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx})\n{original_block_lines} ->\n{combined_content}")
+				# --- Comment Preservation Block ---
+				comment_map = {}
+				orphan_comments = []
+				# print(f"original_block_lines: {lines[start_line_idx : end_line_idx + 1]}")
+				# cleaned_code_block_lines = tar.split('\n')
+				# print(f"cleaned_code_block_lines: {cleaned_code_block_lines}")
+				# Collect all comments in a single loop
+				for line in original_block_lines:
+					if '#' in line:
+						parts = line.split('#', 1)
+						code_key = parts[0].strip()
+						if code_key:  # Only map if there's actual code on the line
+							comment_map[code_key] = line[len(parts[0]):] # Store the comment
+						else: # Full line
+							orphan_comments.append(line)
+
+				used_comment_keys = set()
+				# 1. Re-attach comments to identical lines by appending the comment part
+				if comment_map:
+					for i, new_line in enumerate(new_content_lines):
+						stripped_new_line = new_line.strip()
+						if not comment_map: break
+						if stripped_new_line in comment_map:
+							# Append the original comment instead of replacing the whole line
+							new_content_lines[i] = new_line + " " + comment_map[stripped_new_line]
+							used_comment_keys.add(stripped_new_line)
+							del comment_map[stripped_new_line]
+							continue
+						# If no exact match, try to match the part before " = "
+						elif ' = ' in stripped_new_line:
+							new_line_key1, new_line_key2 = stripped_new_line.split(' = ', 1)
+							new_line_key1 = new_line_key1.strip()
+							new_line_key2 = new_line_key2.strip()
+							if not new_line_key1: continue
+							# Only proceed if we have a valid key to search for
+							elif new_line_key1:
+								for original_key in comment_map:
+									if original_key in used_comment_keys:
+										del comment_map[original_key]
+										continue
+									elif ' = ' in original_key:
+										org_key1, org_key2 = original_key.split(' = ', 1)
+										org_key1 = org_key1.strip()
+										org_key2 = org_key2.strip()
+										if new_line_key1 in org_key1:
+											if new_line_key2 in org_key2 or org_key2 == 'yes' or org_key2 == 'no':
+												new_content_lines[i] = new_line + " " + comment_map[original_key]
+												used_comment_keys.add(original_key)
+												del comment_map[original_key]
+												break # Found match, exit inner loop
+					# Collect remaining orphan comments from changed code lines
+					if comment_map:
+						for original_key, comment_part in comment_map.items():
+							if original_key not in used_comment_keys:
+								orphan_comments.append(comment_part)
+				# --- End of Comment Preservation Block ---
+				if orphan_comments:
+					comment_map = '\n\t'.join(orphan_comments)
+					logger.warning(f"Some code comments may lost:\n{comment_map}")
+				# TODO very buggy
+				# 	# Determine indentation for orphan comments from the original block's structure
+				# 	indentation = ''
+				# 	for line in original_block_lines:
+				# 		if line.strip():
+				# 			indentation = line[:len(line) - len(line.lstrip())]
+				# 			break
+				# 	orphan_comments = [f"{indentation} {comment.strip()}" for comment in orphan_comments]
+				new_content = '\n'.join(new_content_lines)
+				logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx})\n{tar} \u2935\n'{new_content}'")
+				# Final assembly: place orphan comments before the modified original line
+				lines = (
+					lines[:start_line_idx] +
+					new_content_lines +
+					# orphan_comments + # TODO very buggy
+					lines[end_line_idx + 1:]
+				)
+
 		else:
 			logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
-
 		# return lines
 
 	# - Optimized Set-Function (since v4.0) -
@@ -3243,6 +3357,7 @@ def modfix(file_list, is_subfolder=False):
 				if len(content_part) > 1 and len(content_part[1]) > 0:
 					cmt = content_part[1]
 					content_part = content_part[0]
+
 					# We have a real separate comment
 					if len(content_part.rstrip()) > 0:
 						# No rstrip as we keep original space separator
@@ -3429,7 +3544,7 @@ def modfix(file_list, is_subfolder=False):
 										valid_lines[l] = (i, ind, line_changed, cmt)
 										changed = True
 										logger.info(
-											f"\tUpdated file: {basename} on:\n{stripped} (line {i}) with:\n{line_changed}\n"
+											f"\tUpdated file: {basename} on (line {i}):\n{stripped} with:\u2935\n{line_changed}\n"
 										)
 										# Check if the match spans the entire line (excluding leading/trailing whitespace)
 										if m.start() <= 6 and m.end() >= len(stripped) - 6:
@@ -3455,12 +3570,19 @@ def modfix(file_list, is_subfolder=False):
 								logger.warning(f"Potentially deprecated Syntax ({msg}): {m.group(0)} in line {i} file {basename}\n")
 								break # just one hit per file
 
-				# out = "\n".join(lines)
+				out = "\n".join(lines)
 				if code_cosmetic and subfolder.endswith(WEIGHT_FOLDERS):
-					out, changed = merge_factor0_modifiers("\n".join(lines), changed)
-					lines = out.splitlines()
+					out, changed = merge_factor0_modifiers(out, changed)
 
-				cleaned_code = clean_by_blanking(lines)
+				# lines_len_before = len(lines)
+				# Theoretically we could take the previous lines, but they are possible affected by additional LB
+				cleaned_code, lines = clean_by_blanking(out)
+				# lines_len_after = cleaned_code.count('\n') + 1
+				# if lines_len_after != lines_len_before:
+				# 	logger.warning(
+				# 		f"Mismatch lines for cleaned_code at {basename}\n"
+				# 		f"lines before {lines_len_before} != {lines_len_after} lines after"
+				# 	)
 
 				for pattern, repl in tar4:  # new list way
 					folder = False # check valid folder before loop
@@ -3485,27 +3607,20 @@ def modfix(file_list, is_subfolder=False):
 								folder = False
 								logger.debug(f"\tNOT APPLIED: {pattern} in file {basename}", )
 						else: folder = True
-
 					elif isinstance(repl, tuple):
 						# if len(repl) < 2 and isinstance(repl[0], tuple): print("DAMN!", repl)
 						# if len(repl) > 2: print("TOO TUPLE!", repl)
 						folder, repl = repl
 						folder = check_folder(folder)
-
 					else:
 						folder = True
-
 					if not folder or not pattern.search(cleaned_code):
 						continue
-
 					if not replace and isinstance(repl, str) or callable(repl): # potential slow down TESTME
 						replace = [pattern, repl]
 						sr = False
 
 					if replace and isinstance(replace, list):
-						# if not debug_mode:
-						# 	targets = pattern.finditer(out) # pattern.findall(out)
-						# else:
 						elapsed = time.perf_counter()
 						# Use finditer to get all non-overlapping matches for the pattern
 						# targets = pattern.finditer(out) Old limited, due code comments
@@ -3561,7 +3676,8 @@ def modfix(file_list, is_subfolder=False):
 				# Sort by the match's starting character position in reverse
 				# This ensures that changes at the end of the file don't affect the indices of changes that need to happen earlier in the file.
 				replacements_to_apply.sort(key=lambda r: r['match'].start(), reverse=True)
-				# if len(replacements_to_apply): print(f"✅ Found {len(replacements_to_apply)} total matches in {basename}.")
+				if replacements_to_apply:
+					logger.debug(f"✅ Found {len(replacements_to_apply)} total matches in {basename}.")
 
 				# Apply all changes using a new inline replacement function
 				for replacement in replacements_to_apply:
@@ -3853,7 +3969,8 @@ if __name__ == "__main__":
 	# if hasattr(log_file, 'close') and callable(getattr(log_file, 'close')) and not hasattr(log_file, 'closed') and not log_file.closed:
 	#	 log_file.close()
 	# if debug_mode:
-	print("\n=== Regex Timing Summary (Top 7) ===") # Find possible Catastrophic Backtracking
-	regex_times = sorted(regex_times.items(), key=lambda kv: kv[1], reverse=True)[:7]
-	for pat, total in regex_times:
-		print(f"{pat.pattern:40} {total * 1000:.4f} ms")
+	if regex_times:
+		regex_times = sorted(regex_times.items(), key=lambda kv: kv[1], reverse=True)[:7]
+		print(f"\n=== Regex Timing Summary (Top {len(regex_times)}) ===") # Find possible Catastrophic Backtracking
+		for pat, total in regex_times:
+			print(f"{pat.pattern:40} {total * 1000:.4f} ms")
