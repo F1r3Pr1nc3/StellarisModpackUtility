@@ -61,6 +61,7 @@ def parse_arguments():
 	parser.add_argument('-ut', '--ACTUAL_STELLARIS_VERSION_FLOAT', type=str, default="4.0", help='Specify the version number to update only, e.g., 3.7')
 	parser.add_argument('-input', '--mod_path', type=str, default="", help='Path to the mod directory')
 	parser.add_argument('-output', '--mod_outpath', type=str, default="", help='(Optional) Output path for the updated mod')
+
 	return parser.parse_args()
 
 # Process boolean parameters
@@ -173,7 +174,6 @@ def divide_by_100(m):
 		prefix = "".join(m.groups()[:-1])
 		original_value = int(m.groups()[-1])
 	if original_value % 100 == 0:
-		# new_value = original_value / 100.0 # float division
 		new_value = original_value // 100 # floor division (or integer division), rounds the result down
 	else:
 		new_value = original_value
@@ -324,8 +324,12 @@ revert_v4_0 = {
 		r"^(triggered_pop_)group_(modifier)\b": (["common/pop_categories", "common/inline_scripts", "common/pop_jobs", "common/species_rights", "common/traits"], r"\1\2"),
 
 		# --- Reversions Requiring Lambdas/Functions ---
-		r"\b(sapient_pop|pop)_amount\s*([<=>]+)\s*(\d+)": lambda m: f"num_{m.group(1)}s {m.group(2)}{divide_by_100(m.group(3))}",
+		r"\b(sapient_pop|pop)_amount\s*([<=>]+)\s*(\d{3,6})": lambda m: f"num_{m.group(1)}s {m.group(2)}{divide_by_100(m.group(3))}",
 		r"\bpop_force_add_ethic = \{ ethic = ([\d\w\.:]+) percentage = 1 \}": r"pop_force_add_ethic = \1",
+		r"\b(create_pop)_group( = \{ species = [\w\.:]+ )(?:(?:count|size) = (\d{3,6})\s+)?": lambda m:
+			f"{m.group(1)}{m.group(2)}"
+			f"count = {divide_by_100(m.group(3))}"
+			if m.group(3) else '',
 		r"\b(set|set_timed|has|remove)_pop_group_flag\b": r"\1_pop_flag",
 		r"\bplanet_resettlement_unemployed_destination_(mult|add) = (-?[\d.]+)": lambda m: f"planet_immigration_pull_{m.group(1)} = {float(m.group(2)) / 2}",
 		r"\bbuild_type = outside_gravity_well\b":  ("common/megastructures", "build_outside_gravity_well = yes"),
@@ -337,8 +341,8 @@ revert_v4_0 = {
 
 		# --- Reversions Using the 'divide_by_100' Function ---
 		fr"\b((?:num_unemployed|free_(?:{PLANET_MODIFIER}))\s*[<=>]+)\s*(-?\d\d+)\b": divide_by_100,
-		fr"\b(min_pops_to_kill_pop\s*[<=>]+)\s*(\d+)\b": divide_by_100,
-		fr"\b(job_\w+_add =)\s*(-?\d+)\b": divide_by_100,
+		r"\b(min_pops_to_kill_pop\s*[<=>]+)\s*(\d{2,6})\b": divide_by_100,
+		r"\b(job_\w+_add =)\s*(-?\d{3,6})\b": divide_by_100,
 		r"\b((?:pop_group_size|(sapient_)?pop_amount)\s*([<=>]+)\s*([\w@.]+))": lambda m:
 			f"num_{(m.group(2) if m.group(2) else '')}pops {m.group(3)}" + (
 				divide_by_100(m.group(4)) if re.match(r"^\d+$", m.group(4)) else m.group(4)
@@ -381,17 +385,17 @@ revert_v4_0 = {
 		],
 		r"((\s+)kill_pop_group = \{[^{}]+\2\})" : "kill_pop = yes",
 		# --- Reverting Multiplied Numeric Values ---
-		r"(?<!\bmodifier = \{\n)\t\t\t((?:planet_(?:%s|amenities_no_happiness|crime)_add =)\s*(-?\d+))\s+?(?!(?:mult =|}\n\t\tmult =))" % PLANET_MODIFIER: [
+		r"(\b(?:planet_(?:%s|amenities_no_happiness|crime)_add =)\s*(-?\d{3,6}))\s+?(?!(?:mult =|}\n\t\tmult =))" % PLANET_MODIFIER: [
 			r"(planet_\w+_add =)\s*(-?\d+)", divide_by_100
 		],
 		# Capturing content in group(1) for sub-patterns
-		r"\b(count_owned_pop_amount = \{\s*(?:limit = \{[^#]+?\}\s+)?count\s*[<=>]+\s*\d+)": [
+		r"\b(count_owned_pop_amount = \{\s*(?:limit = \{[^#]+?\}\s+)?count\s*[<=>]+\s*\d{3,6})": [
 			r"(count_owned_pop)_amount( = \{\s*(?:limit = \{[^#]+?\}\s+)?)count\s*([<=>]+)\s*(\d+)",
 			lambda m: f"{m.group(1)}{m.group(2)}count {m.group(3)}{divide_by_100(m.group(4))}"
 		],
 		# numeric counters back down
-		r"\bnum_assigned_jobs = \{\s*(?:job = [^{}\s]+\s+)?(value\s*[<=>]+\s*\d+00)\b": [
-			r"(value [<=>]+) (\d+00)", divide_by_100
+		r"\bnum_assigned_jobs = \{\s*(?:job = [^{}\s]+\s+)?(value\s*[<=>]+\s*\d{3,6})\b": [
+			r"(value [<=>]+) (\d+)", divide_by_100
 		],
 		# --- Reverting Resettlement Logic ---
 		r"\b(resettle_pop_group = \{\s+POP_GROUP = ([\d\w\.:]+)\s+PLANET = ([\d\w\.:]+)\s+(?:AMOUNT|PERCENTAGE) = [\d.]+\s+)":
@@ -417,7 +421,7 @@ revert_v4_0 = {
 			lambda p: dedent_block(p.group(2)), # just drop wrapper, keep original lines
 
 		# --- Reverting Misc Changes ---
-		r"((\s+planet_)structures(_(?:cost|upkeep)_mult = [\d.]+)\b)": r"\2buildings\3\1\2districts\3",
+		r"(\n\t+planet_)structures(_(?:cost|upkeep)_mult = [\d.]+)\b": r"\1buildings\3\1districts\3",
 		# --- Reverting job_calculator expansion ---
 		# revert the three-specialised job_* lines back into a single job_calculator_add (if they are contiguous)
 		r"(?:\n\t+job_calculator_(?:biologist|engineer|physicist)_add = -?\d+){3}": [
@@ -2712,7 +2716,9 @@ def modfix(file_list, is_subfolder=False):
 			# Handle the simple case first: a single-line match is purely character-based.
 			if start_line_idx == end_line_idx: # SINGLE-LINE match
 				lines = lines[:start_line_idx] + [new_content] + lines[start_line_idx + 1:]
-				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block_lines[0]}' \u2935\n'{new_content_lines[0]}'")
+				original_block = '\n'.join(original_block_lines)
+				new_content = ''.join(new_content_lines)
+				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block}' \u2935\n'{new_content}'")
 			else: # MULTI-LINE match
 				# --- Comment Preservation Block ---
 				comment_map = {}
