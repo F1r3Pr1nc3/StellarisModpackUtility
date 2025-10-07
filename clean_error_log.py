@@ -139,12 +139,14 @@ text_important_warnings_list = [
 ]
 
 def extra_warning(filename, text_list):
+	warnings_set = set()
 	with open(filename, "r", encoding="utf-8", errors='replace') as f:
 		lines = f.readlines()
 	for index, line in enumerate(lines):
 		for text in text_list:
-			if text in line:
-				print("WARNING", index, line)
+			if text in line and line not in warnings_set:
+				warnings_set.add(line)
+				print("WARNING", index, len(warnings_set), line)
 
 remove_lines_with_text(filename, text_to_remove_list)
 remove_lines_with_first_hit(filename, text_first_remove_list)
