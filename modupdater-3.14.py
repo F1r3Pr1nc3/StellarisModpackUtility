@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2025/10/07
+# @Revision: 2025/10/08
 # @Git: https://github.com/F1r3Pr1nc3/StellarisModpackUtility/blob/master/modupdater.py
 # @Helper-script - creating change-catalogue: https://github.com/F1r3Pr1nc3/Stellaris-Mod-Updater/stellaris_diff_scanner.py
 # @Forum: https://forum.paradoxplaza.com/forum/threads/1491289/
@@ -35,7 +35,7 @@ mod_path = "" # "d:/GOG Games/Settings/Stellaris/Stellaris4.1.xx_patch" # Stella
 # e.g. "c:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod\\atest\\"   "d:\\Steam\\steamapps\\common\\Stellaris"
 only_warning = 0
 only_actual = 0
-code_cosmetic = 0 # Still BETA
+code_cosmetic = 1 # Still BETA
 also_old = 0
 mergerofrules = 0 # Forced support for compatibility with The Merger of Rules (MoR)
 keep_default_country_trigger = 0
@@ -2606,12 +2606,11 @@ def modfix(file_list, is_subfolder=False):
 
 	### --- --- --- Helper Functions --- --- --- ###
 
-	def clean_by_blanking(source_code: str) -> tuple[str, list[str]]:
+	def clean_by_blanking(original_lines: list[str]) -> Tuple[str, bool]:
 		"""
 		Cleans code by replacing non-code lines with blank lines,
 		preserving the original line count.
 		"""
-		original_lines = source_code.splitlines()
 		cleaned_lines = []
 		for line in original_lines:
 			if not line.strip() or line.strip().startswith('#'):
@@ -2619,14 +2618,14 @@ def modfix(file_list, is_subfolder=False):
 			else:
 				code_part = line.split('#', 1)[0].rstrip()
 				cleaned_lines.append(code_part)
-		return '\n'.join(cleaned_lines), original_lines
+		return '\n'.join(cleaned_lines), False
 
-	def apply_inline_replacement(match: re.Match, replace: tuple, sr: bool ) -> List[str]:
+	def apply_inline_replacement(lines: List[str], need_clean_code: bool, match: re.Match, replace: tuple, sr: bool ) -> Tuple[List[str], bool]:
 		"""
 		Performs a precise, character-based replacement for a given match,
 		preserving indentation and surrounding text.
 		"""
-		nonlocal lines, cleaned_code, changed
+		nonlocal changed
 		new_content = ""
 		# Get global character positions from the match
 		if sr and match.groups(): # Does only count capturing groups
@@ -2654,21 +2653,25 @@ def modfix(file_list, is_subfolder=False):
 		if rt != 1:
 			new_content = False
 		if new_content and (isinstance(new_content, str) and isinstance(tar, str) and tar != new_content):
-			if tar.startswith('\n'):
-				start_char += 1
-				start_col = "" # so we need no prefix
-				if new_content.startswith('\n'):
-					new_content = new_content[1:]
+			common_prefix_len = 0
+			if tar.startswith('\n') and new_content.startswith('\n'):
+				common_prefix_len += 1
+				start_col = "" # we don't need a prefix
+				# print("start_col")
+				new_content = new_content[1:]
 			else:
 				# Find the character index of the start of the lines containing the match
 				start_col = cleaned_code.rfind('\n', 0, start_char) + 1
 				start_col = start_char - start_col # Calculate the column numbers
 			# It counts the newlines in the substring *before* the character.
-			start_line_idx = cleaned_code[:start_char].count('\n')
+			start_line_idx = cleaned_code[:start_char].count('\n') + common_prefix_len
 
-			if tar.endswith('\n'):
+			# common_prefix_len = 0
+			if tar.endswith('\n') and new_content.endswith('\n'):
 				end_char -= 1
-				end_col = "" # so we need no suffix
+				end_col = "" # we don't need a suffix
+				# print("end_col")
+				new_content = new_content[:-1]
 			else:
 				end_col = cleaned_code.rfind('\n', 0, end_char) + 1
 				end_col = end_char - end_col # Calculate the column numbers
@@ -2677,7 +2680,11 @@ def modfix(file_list, is_subfolder=False):
 			# print(f"{basename} lines {len(lines)} ({start_line_idx}-{end_line_idx}):\n'{tar}':\n'{new_content}'\n{replace[0].pattern}")
 			changed = True
 
-			# --- Perform the stitching ---
+			# Simultaneously, update the cleaned code with a string slice (OPTIMIZATION: omits steady clean_by_blanking)
+			# TODO not working properly
+			# cleaned_code = cleaned_code[:start_char] + new_content + cleaned_code[end_char:]
+
+			# --- Perform the line stitching ---
 			if end_col != "":
 				end_col = lines[end_line_idx][end_col:]
 			if start_col != "":
@@ -2719,13 +2726,16 @@ def modfix(file_list, is_subfolder=False):
 			original_block_lines = original_block_lines[common_prefix_len : ] # len(original_block_lines)- common_suffix_len # minimal_original_block
 			new_content_lines = new_content_lines[common_prefix_len : ] # len(new_content_lines) - common_suffix_len  # minimal_new_block_lines
 			start_line_idx += common_prefix_len # final_start_idx
-			# end_line_idx = end_line_idx - common_suffix_len + 1 # slice_to_remove_end_idx
+			# end_line_idx -= common_suffix_len + 1 # slice_to_remove_end_idx
 
+			if len(new_content_lines) > 1 len(new_content_lines) != len(original_block_lines):
+				need_clean_code = True
+				
 			# Handle the simple case first: a single-line match is purely character-based.
 			if start_line_idx == end_line_idx: # SINGLE-LINE match
 				lines = lines[:start_line_idx] + new_content_lines + lines[start_line_idx + 1:]
 				original_block = '\n'.join(original_block_lines)
-				new_content = ''.join(new_content_lines)
+				new_content = '\n'.join(new_content_lines)
 				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 			else: # MULTI-LINE match
 				# --- Comment Preservation Block ---
@@ -2797,7 +2807,7 @@ def modfix(file_list, is_subfolder=False):
 				# 	orphan_comments = [f"{indentation} {comment.strip()}" for comment in orphan_comments]
 				new_content = '\n'.join(new_content_lines)
 				original_block = '\n'.join(original_block_lines)
-				logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx})\n{original_block} with:\u2935\n'{new_content}'")
+				logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 				# Final assembly: place orphan comments before the modified original line
 				lines = (
 					lines[:start_line_idx] +
@@ -2808,7 +2818,7 @@ def modfix(file_list, is_subfolder=False):
 
 		else:
 			logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
-		# return lines
+		return lines, need_clean_code
 
 	# - Optimized Set-Function (since v4.0) -
 	def find_with_set_optimized(lines, valid_lines, changed):
@@ -3412,6 +3422,7 @@ def modfix(file_list, is_subfolder=False):
 					if indent_level < 0: # Should never happen
 						logger.error(f"⚠ Mismatch BRACKET in line {i} on file {subfolder}/{basename}")
 						indent_level = 0
+						changed = False
 						break # We need a full break as we don't know the exact mismatch location.
 						return lines, []
 					# Handle wrong bracket nesting"else = { } }"
@@ -3463,6 +3474,7 @@ def modfix(file_list, is_subfolder=False):
 
 		# logger.info(f"Indentation correction finished.")
 		if deleted_lines + added_lines != len(lines)-len(new_lines): # Should never happen
+			changed = False
 			logger.error(f"⚠ Mismatch LINES count at file {subfolder}/{basename} (virtual count {deleted_lines - added_lines} != {len(lines)-len(new_lines)}).")
 
 		if len(new_lines) > 2 and new_lines[-1]: # and "inline_scripts" not in subfolder
@@ -3501,8 +3513,6 @@ def modfix(file_list, is_subfolder=False):
 				# if code_cosmetic:
 					# do_code_cosmetic(lines)
 				lines, valid_lines = format_indentation(lines)
-				# Collect aLL matches from ALL rules before changing anything
-				replacements_to_apply: List[Dict[str, Any]] = []
 
 				# Since v4.0
 				if ACTUAL_STELLARIS_VERSION_FLOAT > 3.99:
@@ -3564,7 +3574,7 @@ def modfix(file_list, is_subfolder=False):
 										# Check if the match spans the entire line (excluding leading/trailing whitespace)
 										if m.start() <= 6 and m.end() >= len(stripped) - 6:
 											logger.debug("The entire line is matched; no further matches possible.")
-											# del valid_lines[l] # just one hit per line if count=1
+											del valid_lines[l] # just one hit per line if count=1
 									else:
 										logger.debug(f"BLIND MATCH (tar3): {stripped}, {pattern}")
 								else:
@@ -3589,15 +3599,18 @@ def modfix(file_list, is_subfolder=False):
 				if code_cosmetic and subfolder.endswith(WEIGHT_FOLDERS):
 					out, changed = merge_factor0_modifiers(out, changed)
 
+				if changed:
+					lines = out.splitlines() # Theoretically we could take the previous lines, but they are possible affected by additional LB
 				# lines_len_before = len(lines) # DEBUG
-				# Theoretically we could take the previous lines, but they are possible affected by additional LB
-				cleaned_code, lines = clean_by_blanking(out)
+				# cleaned_code = clean_by_blanking(lines)
 				# lines_len_after = cleaned_code.count('\n') + 1 # DEBUG
 				# if lines_len_after != lines_len_before:
-				# 	logger.warning(
+				# 	changed = False
+				# 	logger.error(
 				# 		f"Mismatch lines for cleaned_code at {basename}\n"
 				# 		f"lines before {lines_len_before} != {lines_len_after} lines after"
 				# 	)
+				need_clean_code = True
 
 				for pattern, repl in tar4:  # new list way
 					folder = False # check valid folder before loop
@@ -3629,7 +3642,11 @@ def modfix(file_list, is_subfolder=False):
 						folder = check_folder(folder)
 					else:
 						folder = True
-					if not folder or not pattern.search(cleaned_code):
+					if not folder:
+						continue
+					if need_clean_code:
+						cleaned_code, need_clean_code = clean_by_blanking(lines)
+					if not pattern.search(cleaned_code):
 						continue
 					if not replace and isinstance(repl, str) or callable(repl): # potential slow down TESTME
 						replace = [pattern, repl]
@@ -3648,11 +3665,12 @@ def modfix(file_list, is_subfolder=False):
 						# else:
 						# 	targets = list(targets)
 						# 	# print(f"tar4: {targets}, {type(targets)}")
+						# Find all matches for the CURRENT RULE ONLY
+						replacements_to_apply: List[Dict[str, Any]] = []
 
 						if sr and isinstance(replace[0], str):
 							repl[0] = replace[0] = re.compile(replace[0], flags=re.I | re.ASCII)
 							logger.debug(f"Compiled: {tar4[1][0]} - {type(tar4[1][0])}")
-						matches_count = 0
 						# Store the match objects, as we need to manipulate the source file at once
 						for t in targets:
 							replacements_to_apply.append({
@@ -3660,39 +3678,23 @@ def modfix(file_list, is_subfolder=False):
 								'new_content': replace,
 								'sr': sr
 							})
-							matches_count += 1
-						if matches_count:
-							logger.debug(f"✅ Found {matches_count} total matches for {pattern.pattern} in {basename}.")
 					else:
 						logger.warning(f"⚠ SPECIAL TYPE? {type(repl)} {repl}")
 
-				# Sort by the match's starting character position in reverse
-				# This ensures that changes at the end of the file don't affect the indices of changes that need to happen earlier in the file.
-				replacements_to_apply.sort(key=lambda r: r['match'].start(), reverse=True)
-				if replacements_to_apply:
-					logger.debug(f"✅ Found {len(replacements_to_apply)} total matches in {basename}.")
+					# Apply separately for each target (crucial to avoid overlaps).
+					if replacements_to_apply:
+						logger.debug(f"✅ Found {len(replacements_to_apply)} total matches for {pattern.pattern} in {basename}.")
+						# Crucial point: reverse order to ensures that changes at the end of the file don't affect the indices of changes that need to happen earlier in the file.
+						for replacement in reversed(replacements_to_apply):
+							# Execute replacements for this pass. The `apply` function modifies the `lines` list in place.
+							lines, need_clean_code = apply_inline_replacement(
+									lines,
+									need_clean_code,
+									replacement['match'],
+									replacement['new_content'],
+									replacement['sr']
+								)
 
-				# "--- Phase 2.5: Conflict Resolution (Pruning) overlapping matches ---")
-				pruned_replacements: List[Dict[str, Any]] = []
-				last_match_start = float('inf')
-				for replacement in replacements_to_apply:
-					current_match = replacement['match']
-					# If the current match ends before the last-kept match begins, it's safe.
-					if current_match.end() <= last_match_start:
-						pruned_replacements.append(replacement)
-						last_match_start = current_match.start()
-					else:
-						# TODO try another solution
-						logger.warning(f"-> Discarding nested match at position {current_match.start()} "
-							  f"because it overlaps with a larger one.")
-
-				# "--- Phase 3: Executing (pruned) replacements ---"
-				for replacement in pruned_replacements:
-					apply_inline_replacement(
-						replacement['match'],
-						replacement['new_content'],
-						replacement['sr']
-					)
 				out = '\n'.join(lines) # Final result
 
 				if changed and not only_warning:
