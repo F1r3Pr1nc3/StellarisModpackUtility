@@ -2728,9 +2728,9 @@ def modfix(file_list, is_subfolder=False):
 			start_line_idx += common_prefix_len # final_start_idx
 			# end_line_idx -= common_suffix_len + 1 # slice_to_remove_end_idx
 
-			if len(new_content_lines) > 1 len(new_content_lines) != len(original_block_lines):
+			if len(new_content_lines) > 1 and len(new_content_lines) != len(original_block_lines):
 				need_clean_code = True
-				
+
 			# Handle the simple case first: a single-line match is purely character-based.
 			if start_line_idx == end_line_idx: # SINGLE-LINE match
 				lines = lines[:start_line_idx] + new_content_lines + lines[start_line_idx + 1:]
