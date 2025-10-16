@@ -38,7 +38,7 @@ text_to_remove_list = [
 		"is used but not localized!",
 		"Missing localization key",
 		"Using deprecated category 'type'. Use 'class' or 'ability' instead.  file: scripted effect dmm_",
-		"D:\Gog Games\Settings\Potent-Rebellions.git\mod\events\ccrebel_fixes.txt] for effect tooltip",
+		r"D:\\Gog Games\\Settings\\Potent-Rebellions.git\\mod\\events\\ccrebel_fixes.txt] for effect tooltip",
 		"autosave", 
 		"is already taken", 
 		"No valid colonization date", 
@@ -140,13 +140,28 @@ text_important_warnings_list = [
 
 def extra_warning(filename, text_list):
 	warnings_set = set()
+	filtered_lines = []
 	with open(filename, "r", encoding="utf-8", errors='replace') as f:
 		lines = f.readlines()
-	for index, line in enumerate(lines):
+	for nr, line in enumerate(lines):
 		for text in text_list:
 			if text in line and line not in warnings_set:
 				warnings_set.add(line)
-				print("WARNING", index, len(warnings_set), line)
+				line = (len(warnings_set), nr, line)
+				filtered_lines.append(line)
+				print("WARNING", line)
+
+	filename = os.path.basename(filename)
+	with open(os.path.join(logs_path, "cleaned_" + filename), "w", encoding="utf-8", errors='replace') as f:
+		# f.writelines(filtered_lines)
+		for i, nr, line in filtered_lines:
+			prefix = lines[nr+1].strip()
+			if prefix.startswith("["):
+				prefix = ""
+			if prefix != "":
+				prefix = "\n" + prefix
+
+			f.write(f"\n({i}. [{nr}]): {line.strip()}{prefix}")
 
 remove_lines_with_text(filename, text_to_remove_list)
 remove_lines_with_first_hit(filename, text_first_remove_list)
