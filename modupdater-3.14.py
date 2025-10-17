@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2025/10/16
+# @Revision: 2025/10/17
 # If you find this tool helpful, consider supporting development:
 # 	Buy me a coffee on Ko-fi https://ko-fi.com/f1r3pr1nc3
 # 	Donate via PayPal https://www.paypal.me/supportfireprinc
@@ -574,8 +574,8 @@ v3_12 = {
 if code_cosmetic and not only_warning:
 	v3_12["targets3"][r"\bhas_ascension_perk = ap_engineered_evolution\b"] = (("T", "has_genetic_ascension"), "has_genetic_ascension = yes")
 	v3_12["targets4"][
-		r"(?:has_(?:valid_)?civic = civic_(?:hive_)?natural_design\s+?){2}"
-	] = (("T", "is_natural_design_empire"), "is_natural_design_empire = yes")
+		r"(?:(\s+)has_(?:valid_)?civic = civic_(?:hive_)?natural_design){2}"
+	] = (("T", "is_natural_design_empire"), r"\1is_natural_design_empire = yes")
 	v3_12["targets4"][
 		r"(?:has_origin = origin_cybernetic_creed\s+has_country_flag = cyber_creed_advanced_government|has_country_flag = cyber_creed_advanced_government\s+has_origin = origin_cybernetic_creed)"
 	] = (("T", "is_cyber_creed_advanced_government"), "is_cyber_creed_advanced_government = yes")
@@ -956,7 +956,7 @@ v3_5 = {
 		r"\bship_archeaological_site_clues_add =": "ship_archaeological_site_clues_add =",
 		r"\bfraction = \{": ("common/ai_budget", "weight = {"),
 		r"\bstatic_m([ai][xn])(\s*)=\s*\{": ("common/ai_budget", r"desired_m\1\2=\2{"),
-		r"^([^#]*?\bbuildings_(?:simple_allow|no_\w+) = yes)": ("common/buildings", r"# \1", ),  # removed
+		r"^[^#]*?\bbuildings_(?:simple_allow|no_\w+) = yes": ("common/buildings", r"# \g<0>", ),  # removed
 		# r"(\"NAME_[^-\s\"]+)-([^-\s\"]+)\"": r'\1_\2"', mostly but not generally done
 	},
 	"targets4": {
@@ -1327,15 +1327,9 @@ v3_1 = {
 	},
 }
 if code_cosmetic and not only_warning:
-	v3_1["targets4"][
-		r"(?:has_(?:valid_)?civic = civic_(?:corporate_)?crafters\s+?){2}"
-	] = (("T", "is_crafter_empire"), "is_crafter_empire = yes")
-	# v3_1["targets4"][
-	# 	r"(?:has_(?:valid_)?civic = civic_(?:pleasure_seekers|corporate_hedonism)\s+?){2}"
-	# ] = (("T", "is_pleasure_seeker"), "is_pleasure_seeker = yes")
-	v3_1["targets4"][
-		r"(?:has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing\s+?){3,4}"
-	] = (("T", "is_catalytic_empire"), "is_catalytic_empire = yes")
+	v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:corporate_)?crafters){2}" ] = (("T", "is_crafter_empire"), r"\1is_crafter_empire = yes")
+	# v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:pleasure_seekers|corporate_hedonism)){2}" ] = (("T", "is_pleasure_seeker"), r"\1is_pleasure_seeker = yes")
+	v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing){3,4}" ] = (("T", "is_catalytic_empire"), r"\1is_catalytic_empire = yes")
 
 # 3.0 DICK (Nemesis DLC)
 # removed ai_weight for buildings except branch_office_building = yes
@@ -1433,8 +1427,8 @@ if basic_fixes:
 			r"\bhas_authority = (\"?)auth_hive_mind\1\b": (("T", "is_hive_empire"), "is_hive_empire = yes"),
 			r"\bhas_authority = (\"?)auth_corporate\1\b": (("T", "is_megacorp"), "is_megacorp = yes"),
 			r"\bis_country\b": "is_same_empire",
-			r"\bis_same_value = ([\w\.:]+\.(?:controller|(?:space_)?owner)(?:\.overlord)?(?:[\s}]+|$))": r"is_same_empire = \1",
-			r"((?:controller|(?:space_)?owner|overlord|country|federation_ally) = \{|is_ai = (?:yes|no))\s+is_same_value\b": r"\1 is_same_empire",
+			r"\bis_same_value = ([\w\.:]+(?:controller|(?:space_)?owner)(?:\.overlord)?(?:[\s}]+|$))": r"is_same_empire = \1",
+			r"((?:controller|owner|overlord|country|federation_ally) = \{|(?:is_ai|has_federation|is_federation_leader|is_at_war|overlord|subject) = (?:yes|no)|has_country_flag = \w+)\s+is_same_value\b": r"\1 is_same_empire",
 			r"(^\b|[^\._])owner = \{\s*is_same_(?:empire|value) = ([\w\.:]+)\s*\}": r"\1is_owned_by = \2",
 			r"(?<!from = \{ )\b(is_robotic)_species =": ([re.compile(r"common/species_rights.*"), "common/armies"], r"\1 ="),
 		},
@@ -1586,7 +1580,9 @@ if basic_fixes:
 				+ p.group(1)
 				+ dedent_block(f"{(p.group(3) or p.group(7))}")
 			],
-			r"\b(?:%s)_(?:(?:playable_)?country|federation_ally) = \{[^{}#]*?(?:limit = \{\s*)?(?:NO[RT] = \{)?\s*is_same_value\b" % VANILLA_PREFIXES: ["is_same_value", "is_same_empire"],
+			# (?:%s)_(?:(?:playable_)?country|federation_ally) % VANILLA_PREFIXES
+			r"\b(?:controller|owner|overlord|country|federation_ally) = \{[^{}#]*?(?:limit = \{\s*)?(?:NO[RT] = \{)?\s*is_same_value\b":
+				["is_same_value", "is_same_empire"],
 			r"\b(%s)_country = (\{[^{}#]*?(?:limit = \{\s*)?(?:has_event_chain|is_ai = no|is_country_type = default|has_policy_flag|(?:is_zofe_compatible|merg_is_default_empire) = yes))" % VANILLA_PREFIXES:
 				r"\1_playable_country = \2", # Invalid for FE in v4.0 is_galactic_community_member|is_part_of_galactic_council
 			r"^(\s+)(?:is_artificial = yes\s+(?:has_ringworld_output_boost = yes|is_planet_class = (?:pc_ringworld_habitable(_damaged)?|pc_shattered_ring_habitable|pc_habitat|pc_cybrex|pc_cosmogenesis_world))|(?:has_ringworld_output_boost = yes|is_planet_class = (?:pc_ringworld_habitable(_damaged)?|pc_shattered_ring_habitable|pc_habitat|pc_cybrex|pc_cosmogenesis_world))\s+is_artificial = yes)": r"\1is_artificial = yes",
@@ -1661,6 +1657,8 @@ def _apply_version_data_to_targets(source_data_dict):
 	if "targets4" in source_data_dict:
 		actuallyTargets["targets4"].update(source_data_dict["targets4"])
 
+from collections import Counter
+
 def sort_pre_triggers(trigger_block: re.Match) -> str:
 	"""
 	Sorts Stellaris planet pre_triggers based on an estimated priority list.
@@ -1698,22 +1696,47 @@ def sort_pre_triggers(trigger_block: re.Match) -> str:
 	lines = re.findall(r'(\w+ = (?:yes|no)\b)', trigger_block)
 	# 2. Process lines into a structured list of dictionaries ONCE
 	# Each item now contains the pre-calculated key and the original line
-	trigger_data = []
+	unique_trigger_data = []
+	seen_lines = set()
+	removed_duplicates = []
+
+	# Remove completely identical lines first
 	for line in lines:
+		normalized_line = line.strip()
+		if normalized_line in seen_lines:
+			removed_duplicates.append(normalized_line)
+			continue # Skip this duplicate line
+		seen_lines.add(normalized_line)
 		# The split and strip operation now happens only ONCE per line
-		key = line.split('=')[0].strip()
-		trigger_data.append({'key': key, 'line': line})
-	# 3. Use the pre-calculated keys for warnings
-	unknown_triggers = [trigger['key'] for trigger in trigger_data if trigger['key'] not in priority_list]
+		key = normalized_line.split('=')[0].strip()
+		unique_trigger_data.append({'key': key, 'original_line': normalized_line})
+
+	# --- Check for duplicate trigger keys ---
+	if removed_duplicates:
+		# Use Counter to show how many of each were removed
+		removed_counts = Counter(removed_duplicates)
+		for line, count in removed_counts.items():
+			 logger.info(f"HINT: Removed {count} identical duplicate trigger(s): '{line}'")
+
+	# Now, perform checks on the cleaned data
+	all_keys = [trigger['key'] for trigger in unique_trigger_data]
+
+	# Check for conflicting trigger keys (e.g., is_capital = yes AND is_capital = no)
+	key_counts = Counter(all_keys)
+	conflicting_keys = [key for key, count in key_counts.items() if count > 1]
+	if conflicting_keys:
+		logger.warning(f"‼️ HINT: Conflicting triggers found (same key, different values): {conflicting_keys}")
+	# Check for unknown triggers
+	unknown_triggers = [key for key in key_counts if key not in priority_list]
 	if unknown_triggers:
 		logger.warning(f"⚠️The following triggers do not appear to be valid pre-triggers: {unknown_triggers}")
-	# 4. Use the pre-calculated keys for sorting
-	sorted_trigger_data = sorted(trigger_data, key=lambda trigger: (
+
+	sorted_trigger_data = sorted(unique_trigger_data, key=lambda trigger: (
 		priority_list.get(trigger['key'], 99), 
 		trigger['key']
 	))
 
-	return trigger_suffix + "\n\t\t".join([trigger ['line'] for trigger in sorted_trigger_data]) + "\n\t}"
+	return trigger_suffix + "\n\t\t".join([trigger ['original_line'] for trigger in sorted_trigger_data]) + "\n\t}"
 
 
 def add_code_cosmetic():
@@ -1764,12 +1787,12 @@ def add_code_cosmetic():
 	targetsR.append([r"^\s+NO[RT] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[RT] = \{\s*[^{}#\n]+\s*\}", "can be merged into NOR if not in an OR"])  #  [^\d{$@] too rare (could also be auto fixed)
 
 	targets3[r"\b(or|not|nor|and)\s*="] = lambda p: p.group(1).upper() + " ="
+	targets3[r"\bexists = this\b"] = 'is_scope_valid = yes'
 
 	# targets3[r"\s*days = -1\s*"] = ' ' # still needed to execute immediately
 	if full_code_cosmetic:
 		targets3[r"(?:^|[<=>{]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+\b" ] = lambda p: p.group(0).lower()
 		targets3[r"\b(IF|ELSE|ELSE_IF|Owner|CONTROLLER|Controller|LIMIT)\s*="] = lambda p: p.group(1).lower() + " =" # OWNER
-		targets3[r"\bexists = this\b"] = 'is_scope_valid = yes'
 		targets3[r"\blimit = \{\s*\}"] = "# limit = { }"
 		targets3[r'\bhost_has_dlc = "([\s\w]+)"'] = (
 			re.compile(r"^(?!common/(?:traits|scripted_triggers))"),
@@ -1785,9 +1808,9 @@ def add_code_cosmetic():
 		# targets4[r"(\t*?\n){3,6}"] = "\n\n" # cosmetic remove surplus lines
 		# Format Comment
 		# targets3[r"(?<!(?:e\.g|.\.\.))([#.])\t{1,3}([a-z])([a-z]+ +[^;:\s#=<>]+)"] = lambda p:	(p.group(1) + " " + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0)
-		# targets3[r"#([^\-\s#])"] = r"# \1"
+		# targets3[r"#([^\-\s#])"] = r"# \g<0>"
 		# targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
-		# targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \1" # remove comment punctuation mark
+		# targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \g<0>" # remove comment punctuation mark
 		targets3[r"(?<!(?:e\.g|.\.\.))([#.]\t)([a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: (p.group(1) + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0)
 		targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
 		targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 count = 0 limit = {\2} }"
@@ -1990,8 +2013,9 @@ def add_code_cosmetic():
 			r"planet = \{((\s+)[^{}#]*limit = \{)(\2\t?[^#]*?\2\t(?:owner|controller) = \{)",
 			r"colony = {\1\2\thas_owner = yes\3",
 		],
-		r"(?s)((\n\t+)any_(?:playable_)?country = \{\2.*?\2\})": [
-			r"(\n\t+)any_(?:playable_)?country = \{(\1[^#]*?)(\1\t(?:has_event_chain = \w+|is_ai = no|is_country_type = default|has_policy_flag = \w+|(?:is_zofe_compatible|merg_is_default_empire) = yes))",
+		# TODO performance: a lot of blind matches
+		r"(?s)((\n\t+)any_country = \{\2.*?\2\})": [
+			r"(\n\t+)any_country = \{(\1[^#]*?)(\1\t(?:has_event_chain = \w+|is_ai = no|is_country_type = default|has_policy_flag = \w+|(?:is_zofe_compatible|merg_is_default_empire) = yes))",
 			r"\1any_playable_country = {\3\2",
 		],
 		r"(?s)^\t+((?:every|random|count|ordered)_(?:playable_)?country = \{(\s+)[^{}#]*limit = \{\2.*?\2\})": [
@@ -2034,7 +2058,7 @@ def add_code_cosmetic():
 			))
 		],
 		# Effect block must be last
-		# FIXME a lot of BLIND MATCHES
+		# FIXME a lot of blind matches
 		r"(?s)((\n\t+)create_(?:%s) = \{\2\t[^{}]+?\2\teffect = \{\2\t\t.*?)\2\}" % LAST_CREATED_SCOPES: [
 			r"(?s)((\n\t+)create_\w+ = \{\2\t[^{}]+?)(\2\teffect = \{\2\t\t.*?\2\t\})(.*?)$", # (?:\2\t[^\n]+){1,6}
 			r"\1\4\3"
@@ -2544,7 +2568,7 @@ def parse_dir():
 			log_file = logging.FileHandler(log_file, mode='a', encoding='utf-8', errors='replace')
 			# We use StreamHandler because log_file is an already open file stream
 			# log_file = logging.StreamHandler(log_file)
-			log_file.setLevel(logging.DEBUG)
+			log_file.setLevel(logging.DEBUG if debug_mode else logging.INFO)
 			log_file.setFormatter(logging.Formatter('%(levelname)s - %(message)s')) # '%(asctime)s -
 			logger.addHandler(log_file)
 
@@ -2737,11 +2761,6 @@ def modfix(file_list, is_subfolder=False):
 			# For the end character, we look at the character just before it to get the correct line.
 			end_line_idx = cleaned_code[:end_char - 1].count('\n') if end_char > 0 else 0
 			# print(f"{basename} lines {len(lines)} ({start_line_idx}-{end_line_idx}):\n'{tar}':\n'{new_content}'\n{replace[0].pattern}") # DEBUG
-			changed = True
-
-			# Simultaneously, update the cleaned code with a string slice (OPTIMIZATION: omits steady clean_by_blanking)
-			# TODO FIXME not working properly
-			cleaned_code = cleaned_code[:start_char] + new_content + cleaned_code[end_char:]
 
 			# --- Perform the line stitching ---
 			if end_col != "":
@@ -2749,18 +2768,25 @@ def modfix(file_list, is_subfolder=False):
 			if start_col != "":
 				start_col = lines[start_line_idx][:start_col]
 
-			# # DEBUG
-			# cleaned_lines = cleaned_code.splitlines()
+			# lines_len_after = cleaned_code.count('\n') + 1
+			## Simultaneously, update the cleaned code with a string slice (OPTIMIZATION: omits steady clean_by_blanking)
+			cleaned_code = cleaned_code[:start_char + common_prefix_len] + new_content + cleaned_code[end_char:]
+			# cleaned_lines = cleaned_code.splitlines() # DEBUG
+			# # # DEBUG
 			# lines_len_before = len(cleaned_lines) # DEBUG
-			# print("lines_len_before",cleaned_code.count('\n') + 1,"==", lines_len_before)
+			# lines_len_after = cleaned_code.count('\n') + 1
+			# if lines_len_after != lines_len_before:
+			# 	logger.debug(f"lines_len_before {lines_len_after} == {lines_len_before}")
 			# cleaned_lines, need_clean_code = clean_by_blanking(cleaned_lines)
 			# cleaned_code = '\n'.join(cleaned_lines)
 			# lines_len_after = len(cleaned_lines) # DEBUG
-			# print("lines_len_after",cleaned_code.count('\n') + 1,"==", lines_len_after, len(lines))
-			# print("original_block from cleaned code", cleaned_lines[start_line_idx : end_line_idx + 1])
-			# print(f"new_block: '{start_col}' + '{new_content}' + '{end_col}'")
-			# print("original_block",lines[start_line_idx : end_line_idx + 1])
+			# lines_len_before = cleaned_code.count('\n') + 1
+			# if lines_len_after != lines_len_before: # Should never happen
+			# 	logger.debug(f"lines_len_after {lines_len_before} == {lines_len_after} {len(lines)}")
+			# print(f"({lines_len_after} - {len(lines)}) original_block from cleaned code: {cleaned_lines[start_line_idx : end_line_idx + 1]}")
 
+			# print("original_block",lines[start_line_idx : end_line_idx + 1])
+			# print(f"new_block: '{start_col}' + '{new_content}' + '{end_col}'")
 			new_content = start_col + new_content + end_col
 
 			# --- Trim identical lines (from Start and End) FIRST by comparing cleaned versions ---
@@ -2799,15 +2825,16 @@ def modfix(file_list, is_subfolder=False):
 			start_line_idx += common_prefix_len # final_start_idx
 			# end_line_idx -= common_suffix_len + 1 # slice_to_remove_end_idx
 
-			if len(new_content_lines) > 1 and len(new_content_lines) != len(original_block_lines):
-				need_clean_code = True
-
 			# Handle the simple case first: a single-line match is purely character-based.
 			if start_line_idx == end_line_idx: # SINGLE-LINE match
-				lines = lines[:start_line_idx] + new_content_lines + lines[start_line_idx + 1:]
 				original_block = '\n'.join(original_block_lines)
 				new_content = '\n'.join(new_content_lines)
-				logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
+				if original_block != new_content:
+					if len(new_content_lines) != len(original_block_lines):
+						need_clean_code = True
+					changed = True
+					lines = lines[:start_line_idx] + new_content_lines + lines[start_line_idx + 1:]
+					logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 			else: # MULTI-LINE match
 				# --- Comment Preservation Block ---
 				comment_map = {}
@@ -2886,17 +2913,18 @@ def modfix(file_list, is_subfolder=False):
 				new_content = '\n'.join(new_content_lines)
 				original_block = '\n'.join(original_block_lines)
 				if new_content != original_block:
-					logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
-					# Final assembly: place orphan comments before the modified original line
+					if len(new_content_lines) != len(original_block_lines):
+						need_clean_code = True
+					changed = True
 					lines = (
 						lines[:start_line_idx] +
 						new_content_lines +
 						lines[end_line_idx + 1:]
 					)
+					logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 				else:
 					# need_clean_code = False
 					logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
-
 		else:
 			logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
 		return lines, need_clean_code
@@ -3583,7 +3611,7 @@ def modfix(file_list, is_subfolder=False):
 			and os.path.isfile(_file)
 		):
 			lines = ""
-			if debug_mode: logger.debug(f"Check file: {_file}")
+			logger.debug(f"Check file: {_file}")
 			with open(_file, "r", encoding="utf-8", errors="ignore") as txtfile:
 
 				fullpath = os.path.relpath(_file, mod_path).replace("\\", "/")
@@ -3686,16 +3714,6 @@ def modfix(file_list, is_subfolder=False):
 					lines = out.splitlines() # Theoretically we could take the previous lines, but they are possible affected by additional LB
 				
 				need_clean_code = True
-				# lines_len_before = len(lines) # DEBUG
-				# cleaned_code, need_clean_code = clean_by_blanking(lines)
-				# cleaned_code = '\n'.join(cleaned_code)
-				# lines_len_after = cleaned_code.count('\n') + 1 # DEBUG
-				# if lines_len_after != lines_len_before:
-				# 	changed = False
-				# 	logger.error(
-				# 		f"Mismatch lines for cleaned_code at {basename}\n"
-				# 		f"lines before {lines_len_before} != {lines_len_after} lines after"
-				# 	)
 
 				for pattern, repl in tar4:  # new list way
 					folder = False # check valid folder before loop
@@ -3780,6 +3798,16 @@ def modfix(file_list, is_subfolder=False):
 									replacement['new_content'],
 									replacement['sr']
 								)
+
+						if debug_mode:
+							# Doublecheck workaround for unsafe check
+							logger.info(f"pattern replacement end {pattern.pattern}")
+							if not need_clean_code:
+								lines_len_before = len(lines)
+								lines_len_after = cleaned_code.count('\n') + 1 
+								if lines_len_after != lines_len_before:
+									need_clean_code = True
+									logger.warning(f"⚠ Mismatch lines at {basename}\nbefore {lines_len_before} != {lines_len_after} after" )
 
 				out = '\n'.join(lines) # Final result
 
