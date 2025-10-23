@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2025/10/17
+# @Revision: 2025/10/23
 # If you find this tool helpful, consider supporting development:
 # 	Buy me a coffee on Ko-fi https://ko-fi.com/f1r3pr1nc3
 # 	Donate via PayPal https://www.paypal.me/supportfireprinc
@@ -249,7 +249,7 @@ JOBS_EXCLUSION_LIST = r"(?:calculator_biologist|calculator_physicist|calculator_
 # Loc yml job replacement
 # NEW:
 # added @colossus_reactor_cost_1 = 0
-# new general var planet.local_pop_amount and pop_group.local_pop_amount (used in trigger per_100_local_pop_amount)
+# new general var local_pop_amount (used in trigger per_100_local_pop_amount)
 # new complex_trigger per_100_pop_amount (uses scripted trigger pop_amount)
 # starbase scope now supports controller
 # added triggered_planet_pop_group_modifier_for_species/triggered_planet_pop_group_modifier_for_all
@@ -1691,7 +1691,7 @@ def sort_pre_triggers(trigger_block: re.Match) -> str:
 	elif trigger_suffix.startswith("can_join_"):
 		priority_list = pop_priority_list
 
-	trigger_suffix = f"\t{trigger_suffix} = {{\n"
+	trigger_suffix = f"\t{trigger_suffix} = {{\n\t\t"
 	# 1. Extract individual trigger lines like 'key = value'
 	lines = re.findall(r'(\w+ = (?:yes|no)\b)', trigger_block)
 	# 2. Process lines into a structured list of dictionaries ONCE
@@ -1716,7 +1716,7 @@ def sort_pre_triggers(trigger_block: re.Match) -> str:
 		# Use Counter to show how many of each were removed
 		removed_counts = Counter(removed_duplicates)
 		for line, count in removed_counts.items():
-			 logger.info(f"HINT: Removed {count} identical duplicate trigger(s): '{line}'")
+			 logger.info(f"‼️ HINT: Removed {count} identical duplicate trigger(s): '{line}'")
 
 	# Now, perform checks on the cleaned data
 	all_keys = [trigger['key'] for trigger in unique_trigger_data]
@@ -1812,12 +1812,13 @@ def add_code_cosmetic():
 		# targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
 		# targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \g<0>" # remove comment punctuation mark
 		targets3[r"(?<!(?:e\.g|.\.\.))([#.]\t)([a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: (p.group(1) + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0)
-		targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
 		targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 count = 0 limit = {\2} }"
 		targets3[r"\bany(_\w+ = {)\s*\}"] = r"count\1 count > 0 }"
 		targets3[r"\bowner_main_species\b"] = "owner_species"
-		targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value\s*[<=>]+\s*\d+\s+\}"] = [
-			r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }"]
+		targets3[r"\bhas_country_resource = \{\s+type = (\w+)\s+amount\s*([<=>]+\s*\d+)\s+\}"] = r"resource_stockpile_compare = { resource = \1 value \2 }" # The newer syntax
+		# targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
+		# targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value\s*[<=>]+\s*\d+\s+\}"] = [
+		# 	r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }"]
 		targets4[r"\bcount_\w+ = \{\s+limit = \{[^#]+?\}\s+count\s*[<=>]+\s*[^{}\s]+"] = [
 			r"(count_\w+ = \{)(\s+)(limit = \{[^#]+?\})\2(count\s*[<=>]+\s*[^{}\s]+)", r"\1\2\4\2\3"] # Put count first
 		# TODO: not pre_triggers and option parameters
@@ -2183,7 +2184,7 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 
 	merger_triggers = {
 		"is_endgame_crisis": (
-			r"((?:(\s+)(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\b){2,3}|((\s+)is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\b){5})",
+			r"((?:(\s+)(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\b){2,3}|(?:(\s+)is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\b){5})",
 			(NO_TRIGGER_FOLDER, r"\2\3is_endgame_crisis = yes"),
 			4
 		),
@@ -2672,7 +2673,7 @@ def modfix(file_list, is_subfolder=False):
 	]
 
 	# "resolutions", "situations" not working because modifier desc
-	WEIGHT_FOLDERS = ("technology", "ai_budget", "megastructures", "policies", "pop_faction_types", "solar_system_initializers", "tradition_categories", "events")
+	WEIGHT_FOLDERS = ("technology", "ai_budget", "megastructures", "policies", "pop_faction_types", "solar_system_initializers", "tradition_categories", "events", "species_rights", "scripted_effects", "inline_scripts")
 	TARGETS_TRAIT = {
 		re.compile(r"\badd_trait = \"?(\w+)\"?\b"): r"add_trait = { trait = \1 }",
 		re.compile(r"\badd_trait_no_notify = \"?(\w+)\"?\b"): r"add_trait = { trait = \1 show_message = no }",
@@ -3188,7 +3189,7 @@ def modfix(file_list, is_subfolder=False):
 		return lines, valid_lines, changed
 
 	find_re_comm = re.compile(
-		r'^(\t)(?:weight(?:_modifier)?|[Aa][Ii]_weight|monthly_progress|usage_odds) = \{(.+?)^\1\}',
+		r'^(\t)(?:weight(?:_modifier)?|[Aa][Ii]_weight|monthly_progress|usage_odds|ai_will_do) = \{(.+?)^\1\}',
 		flags=re.DOTALL|re.M
 	)
 	find_re_evnt = re.compile(r'^(\t+)random_list = \{(.+?)^\1\}', flags=re.DOTALL|re.M)
@@ -3343,7 +3344,7 @@ def modfix(file_list, is_subfolder=False):
 			return match_parent[:block_coords[0]] + new_content + match_parent[block_coords[1]:]
 
 		# Apply recursively to all scopes that might contain modifiers
-		if subfolder == "events":
+		if subfolder in ("events", "scripted_effects", "inline_scripts"):
 			"""
 			Extracts weight blocks inside 'random_list = { ... }'.
 			Returns list iterator of match objects of block_content.
