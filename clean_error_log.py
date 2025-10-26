@@ -50,39 +50,39 @@ text_to_remove_list = [
 # very specific one-liner
 text_first_remove_list = [
 	"prescripted_countries/00_unused_country.txt", # Vanilla
-	"failed to generate a ship class name for ship size", # ?
-	"Failed to read key reference Infernal from database", # Demon
-	"zz_ascension_perks_override.txt", # Giga
-	"adds_4_asteroid_artillery_points", # Giga
-	"category_good_trading_research_speed_mult", # E&CC    
-	"unique_ascension_perks_modifiers.txt line: 553", # E&CC    
-	"planet_districts_farming_cost_mult", # E&CC    
-	"planet_districts_mining_cost_mult", # E&CC    
-	"unique_ascension_perks_menu_events.txt line: 228",
-	"flag_necron_5.dds", # GRIM
-	"casus_belli_cb_lgate_danger",
-	"LCLUSTER_PROJECT_OVERWRITE",
-	# "Missing localization key []", # UAP
-	"for custom tooltip at  file:", # UAP
-	"invalid modifier \"eye_of_terror_influence", # Shroud
-	"events/shroud_rising_settings_menu.txt line: 27", # Shroud
-	# "Missing localization key [good_trading]", # cultural_overhaul
-	"Missing effects tradition ap_galactic_contender", # UAP
-	"events/adt_gg_events.txt\" near line: 986", # ADT
-	"Invalid mega structure type [lgate_disabled]!", # ADT
-	"add_anomaly effect has invalid anomaly category delete_anomaly_slot at  file: events/anomalies_respawn_events.txt line:",
-	"common/solar_system_initializers/Cmt31_Lgate_initializers.txt", # CM
-	"Malformed token: @standard_", # CM
-	"Error in fire event effect at  file: events/necron_events.txt line:", # GRIM
-	"pc_forge_ring", # GRIM
-	# "tr_tt_", # Tidy Tradition
-	# "tradition_tt", # Tidy Tradition
-	"advisor", 
-	"Invalid origin", 
-	"is_on_border", 
-	"dmm_scripted_effects.txt", # DMM
-	"common/scripted_effects/prob_scripted_effects.txt:9", # PROB
-	"common/war_goals/prob_war_goal.txt\" near line: 10", # PROB
+	# "failed to generate a ship class name for ship size", # ?
+	# "Failed to read key reference Infernal from database", # Demon
+	# "zz_ascension_perks_override.txt", # Giga
+	# "adds_4_asteroid_artillery_points", # Giga
+	# "category_good_trading_research_speed_mult", # E&CC    
+	# "unique_ascension_perks_modifiers.txt line: 553", # E&CC    
+	# "planet_districts_farming_cost_mult", # E&CC    
+	# "planet_districts_mining_cost_mult", # E&CC    
+	# "unique_ascension_perks_menu_events.txt line: 228",
+	# "flag_necron_5.dds", # GRIM
+	# "casus_belli_cb_lgate_danger",
+	# "LCLUSTER_PROJECT_OVERWRITE",
+	# # "Missing localization key []", # UAP
+	# "for custom tooltip at  file:", # UAP
+	# "invalid modifier \"eye_of_terror_influence", # Shroud
+	# "events/shroud_rising_settings_menu.txt line: 27", # Shroud
+	# # "Missing localization key [good_trading]", # cultural_overhaul
+	# "Missing effects tradition ap_galactic_contender", # UAP
+	# "events/adt_gg_events.txt\" near line: 986", # ADT
+	# "Invalid mega structure type [lgate_disabled]!", # ADT
+	# "add_anomaly effect has invalid anomaly category delete_anomaly_slot at  file: events/anomalies_respawn_events.txt line:",
+	# "common/solar_system_initializers/Cmt31_Lgate_initializers.txt", # CM
+	# "Malformed token: @standard_", # CM
+	# "Error in fire event effect at  file: events/necron_events.txt line:", # GRIM
+	# "pc_forge_ring", # GRIM
+	# # "tr_tt_", # Tidy Tradition
+	# # "tradition_tt", # Tidy Tradition
+	# "advisor", 
+	# "Invalid origin", 
+	# "is_on_border", 
+	# "dmm_scripted_effects.txt", # DMM
+	# "common/scripted_effects/prob_scripted_effects.txt:9", # PROB
+	# "common/war_goals/prob_war_goal.txt\" near line: 10", # PROB
 ]
 
 
@@ -135,6 +135,8 @@ text_important_warnings_list = [
 	"Unexpected token",
 	"Wrong scope",
 	"Script Error",
+	"Malformed token",
+	": Unknown ",
 	"Corrupt Event Table Entry",
 ]
 

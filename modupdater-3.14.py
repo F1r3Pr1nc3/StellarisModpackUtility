@@ -48,7 +48,7 @@ log_file = "modupdater.log"
 debug_mode = 0  # without writing file=log_file
 basic_fixes = True
 full_code_cosmetic = False # for extended code_cosmetic option
-any_merger_check = False # for merger_of_rules option
+any_merger_check = True # for merger_of_rules option
 
 def parse_arguments():
 	parser = argparse.ArgumentParser(
@@ -1602,6 +1602,7 @@ if basic_fixes:
 			# r"\b((?:every|random|count|ordered)_system_colony = \{(\s+)[^}#]*limit = \{)\2(?!\s*has_owner = yes)([^}#]*?\})": r"\1\2\thas_owner = yes\2\3",
 		}
 	}
+# End basic fixes
 
 exclude_paths = {
 	"achievements",
@@ -2177,9 +2178,9 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 	else:
 		tar3 = {}
 	tar4 = {
-		r"(?:(\s+)merg_is_(?:fallen_empire|awakened_fe) = yes){2}": r"\1is_fallen_empire = yes",
-		r"(?:(\s+)merg_is_(?:default_empire|awakened_fe) = yes){2}": r"\1is_country_type_with_subjects = yes",
-		r"(?:(\s+)merg_is_(?:default|fallen)_empire = yes){2}": r"\1is_default_or_fallen = yes",
+		r"(?:(\s+)merg_is_(?:fallen_empire|awakened_fe) = yes){2}": (("T", "is_fallen_empire"), r"\1is_fallen_empire = yes"),
+		r"(?:(\s+)merg_is_(?:default_empire|awakened_fe) = yes){2}": (("T", "is_country_type_with_subjects"), r"\1is_country_type_with_subjects = yes"),
+		r"(?:(\s+)merg_is_(?:default|fallen)_empire = yes){2}": (("T", "is_default_or_fallen"), r"\1is_default_or_fallen = yes"),
 	}
 
 	merger_triggers = {
@@ -2190,7 +2191,8 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 		),
 		"merg_is_fallen_empire": (r"\bis_country_type = fallen_empire\b", (("T", "merg_is_fallen_empire"), "merg_is_fallen_empire = yes")),
 		"merg_is_awakened_fe": (r"\bis_country_type = awakened_fallen_empire\b", (("T", "merg_is_awakened_fe"), "merg_is_awakened_fe = yes")),
-		"merg_is_hab_ringworld": (r"\b(is_planet_class = pc_ringworld_habitable\b|uses_district_set = ring_world\b|is_planetary_diversity_ringworld = yes|is_giga_ringworld = yes)" , (("T", "merg_is_hab_ringworld"), "merg_is_hab_ringworld = yes")),
+		"merg_is_hab_ringworld": (r"\b(is_planet_class = pc_ringworld_habitable\b|uses_district_set = ring_world\b|is_planetary_diversity_ringworld = yes|is_giga_ringworld = yes)" ,
+			(("T", "merg_is_hab_ringworld"), "merg_is_hab_ringworld = yes")),
 		"merg_is_hive_world": (r"\b(is_planet_class = pc_hive\b|is_pd_hive_world = yes)", (("T", "merg_is_hive_world"), "merg_is_hive_world = yes")),
 		"merg_is_relic_world": (r"\bis_planet_class = pc_relic\b", (("T", "merg_is_relic_world"), "merg_is_relic_world = yes")),
 		"merg_is_machine_world": (r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)", (("T", "merg_is_machine_world"), "merg_is_machine_world = yes")),
@@ -2201,6 +2203,7 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 		"merg_is_barren": (r"is_planet_class = pc_barren\b", (("T", "merg_is_barren"), "merg_is_barren = yes")),
 		"merg_is_barren_cold": (r"is_planet_class = pc_barren_cold\b", (("T", "merg_is_barren_cold"), "merg_is_barren_cold = yes")),
 		"merg_is_gaia_basic": (r"\b(is_planet_class = pc_gaia|pd_is_planet_class_gaia = yes)\b", (("T", "merg_is_gaia_basic"), "merg_is_gaia_basic = yes")),
+		"merg_is_gas_giant": (r"\b(is_planet_class = pc_gas_giant)\b", (("T", "merg_is_gas_giant"), "merg_is_gas_giant = yes")), 
 		"merg_is_arcology": (r"\b(is_planet_class = pc_city\b|is_pd_arcology = yes|is_city_planet = yes)" , (("T", "merg_is_arcology"), "merg_is_arcology = yes")),
 	}
 	if not keep_default_country_trigger:
@@ -2238,6 +2241,7 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 			"merg_is_barren": ( r"\bmerg_is_(barren) = (yes|no)", merg_planet_rev_lambda ),
 			"merg_is_barren_cold": ( r"\bmerg_is_(barren_cold) = (yes|no)", merg_planet_rev_lambda ),
 			"merg_is_gaia_basic": ( r"\bmerg_is_(gaia)_basic = (yes|no)", merg_planet_rev_lambda ),
+			"merg_is_gas_giant": ( r"\bmerg_is_(gas_giant) = (yes|no)", merg_planet_rev_lambda ),
 			"merg_is_arcology": ( r"\bmerg_is_arcology = (yes|no)", lambda p: {"yes": "is_planet_class = pc_city", "no": "NOT = { is_planet_class = pc_city }"}[p.group(1)] ),
 		}
 
