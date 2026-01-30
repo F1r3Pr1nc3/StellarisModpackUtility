@@ -33,10 +33,10 @@ except:
 # ============== Initialize global variables ===============
 # Variables
 optimize_loc = False  # True/False BETA! Best results if event keys have "event" in they name or they are in a file with event in the name.
-optimize_loc_string = "sleeper"  # only used if optimize_loc is True
+optimize_loc_string = ""  # "sleeper" only used if optimize_loc is True
 
 load_vanilla_loc = True  # True BETA: replaces exact matching strings with vanilla ones
-load_vanilla_loc_update_default = False  # only usable if load_vanilla_loc
+load_vanilla_loc_update_default = True  # only usable if load_vanilla_loc
 VANILLA_IDENTICAL_SUBSTITUTIONS = [
 	{
 		"concept": "PRETHORYN_REPLACEMENT",
@@ -118,7 +118,6 @@ localModPath = ["Special Project Extended", ["german", "russian", "spanish", "br
 localModPath = ["Adeptus Mechanicus Addon", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["CrimsonThrong", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Nanite-Expansion", ["german", "spanish", "braz_por", "polish", "japanese", "korean"]]
-localModPath = ["Counter-Limited Armies Fix", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["FATALF", ["english"]]
 localModPath = ["Grimdark", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["Destiny", ["english"]]
@@ -136,8 +135,9 @@ localModPath = ["ADeadlyTempest", ["polish", "korean"]]
 localModPath = ["UAP_dev", ["german", "spanish", "braz_por", "french", "polish"], ["constructible_l-gate", "l-cluster_access"]]  # , "korean" partial
 localModPath = ["The Wandering Ghost", ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["TheGreatKhanExpanded", []]
+localModPath = ["Counter-Limited Armies Fix", []]
 localModPath = ["Cyberization_Fix", []]
-localModPath = ["Stellaris4.1_fix", []] # [Root.controller.GetResearcherPlural_lower]
+localModPath = ["Stellaris4.2_fix", []] # [Root.controller.GetResearcherPlural_lower]
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
 # local_OVERHAUL = ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]
@@ -967,7 +967,7 @@ for filename in YML_FILES:
 					has_changed = True
 					print(
 						key.encode(errors="replace"),
-						"removed from document ",
+						"removed from",
 						filename.replace(DEFAULT_LANG, lang),
 					)
 

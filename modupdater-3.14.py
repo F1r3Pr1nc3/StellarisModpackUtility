@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2025/10/23
+# @Revision: 2026/01/23@mod
 # If you find this tool helpful, consider supporting development:
 # 	Buy me a coffee on Ko-fi https://ko-fi.com/f1r3pr1nc3
 # 	Donate via PayPal https://www.paypal.me/supportfireprinc
@@ -15,8 +15,6 @@
 # @TODO: replace in *.YML ?
 
 # ============== Import libs Python 3.9 ===============
-import os
-import glob
 import re
 import ctypes.wintypes
 import sys
@@ -29,26 +27,32 @@ import argparse
 import time
 from collections import defaultdict
 from typing import List, Tuple
+from pathlib import Path # Replaced os and glob with pathlib
+# my sub-module
+import logic_optimizer
+import check_civics
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)	   # Ensure all levels pass through
+logger.propagate = False			 # Prevent double logging
 
 ACTUAL_STELLARIS_VERSION_FLOAT = "3.14"  #  Should be number string
-FULL_STELLARIS_VERSION = ACTUAL_STELLARIS_VERSION_FLOAT + '.1592653' # @last supported sub-version
-# Default values
-# mod_path = os.path.dirname(os.getcwd())
-mod_path = "" # "d:/GOG Games/Settings/Stellaris/Stellaris4.1.xx_patch" # Stellaris4.1_upd_test
-# e.g. "c:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod\\atest\\"   "d:\\Steam\\steamapps\\common\\Stellaris"
+FULL_STELLARIS_VERSION = ACTUAL_STELLARIS_VERSION_FLOAT + '.0' # @last supported sub-version
+# Default values C:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod
+mod_path = Path("C:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod") # Initialized as Path object # D:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_fix # Stellaris4.2_update_maker
 only_warning = 0
 only_actual = 0
 code_cosmetic = 1 # Still BETA
 also_old = 0
 mergerofrules = 0 # Forced support for compatibility with The Merger of Rules (MoR)
 keep_default_country_trigger = 0
-mod_outpath = ""  # if you don't want to overwrite the original
-log_file = "modupdater.log"
+mod_outpath = ""  # if you don't want to overwrite the original, Initialized as empty Path
+log_file = "modupdater.log" # Changed to Path object
 # Dev options
-debug_mode = 0  # without writing file=log_file
+debug_mode = 0 # without writing file=log_file
 basic_fixes = True
 full_code_cosmetic = False # for extended code_cosmetic option
-any_merger_check = True # for merger_of_rules option
+any_merger_check = False # for merger_of_rules option
 
 def parse_arguments():
 	parser = argparse.ArgumentParser(
@@ -63,8 +67,8 @@ def parse_arguments():
 	parser.add_argument('-m', '--mergerofrules', action='store_true', help='Forced support for compatibility with The Merger of Rules (MoR)')
 	parser.add_argument('-k', '--keep_default_country_trigger', action='store_true', help='Keep default country trigger')
 	parser.add_argument('-ut', '--ACTUAL_STELLARIS_VERSION_FLOAT', type=str, default="4.0", help='Specify the version number to update only, e.g., 3.7')
-	parser.add_argument('-input', '--mod_path', type=str, default="", help='Path to the mod directory')
-	parser.add_argument('-output', '--mod_outpath', type=str, default="", help='(Optional) Output path for the updated mod')
+	parser.add_argument('-input', '--mod_path', type=Path, default=None, help='Path to the mod directory') # Changed type to Path
+	parser.add_argument('-output', '--mod_outpath', type=Path, default=None, help='(Optional) Output path for the updated mod') # Changed type to Path
 
 	return parser.parse_args()
 
@@ -84,14 +88,14 @@ RESOURCE_ITEMS = r"advanced_logic|alloys|astral_threads|biomass|consumer_goods|e
 # NO_EFFECT_FOLDER = re.compile(r"^(?!common/scripted_effects)")
 NO_TRIGGER_FOLDER = re.compile(r"^([^_]+)(_(?!trigger)[^/_]+|[^_]*$)(?(2)/([^_]+)_[^/_]+$)?")  # 2lvl, only 1lvl folder: ^([^_]+)(_(?!trigger)[^_]+|[^_]*)$ only
 ACTUAL_STELLARIS_VERSION_FLOAT = float(ACTUAL_STELLARIS_VERSION_FLOAT)
-print("ACTUAL_STELLARIS_VERSION_FLOAT", ACTUAL_STELLARIS_VERSION_FLOAT)
-triggerScopes = r"leader|owner|controller|space_owner|(?:prev){1,4}|(?:from){1,4}|root|this|event_target:[\w@]+"
+print(f"ACTUAL_STELLARIS_VERSION_FLOAT {ACTUAL_STELLARIS_VERSION_FLOAT}")
+triggerScopes = r"leader|owner|controller|overlord|space_owner|(?:prev){1,4}|(?:from){1,4}|root|this|event_target:[\w@]+"
 if ACTUAL_STELLARIS_VERSION_FLOAT > 4.0:
 	triggerScopes += r"|owner_or_space_owner"
 SCOPES = triggerScopes + r"|design|megastructure|planet|ship|pop_group|fleet|cosmic_storm|capital_scope|sector_capital|capital_star|system_star|solar_system|star|orbit|army|ambient_object|species|owner_species|owner_main_species|founder_species|bypass|pop_faction|war|federation|starbase|deposit|sector|archaeological_site|first_contact|spy_network|espionage_operation|espionage_asset|agreement|situation|astral_rift"
-triggerScopes += r"|any_\w+|limit|trigger"
+triggerScopes += r"|limit|trigger" # any_\w+|
 
-LAST_CREATED_SCOPES = r"fleet|country|species|system|ship|leader|army" #ambient_object|design|pop_faction|cosmic_storm|cosmic_storm_influence_field|
+LAST_CREATED_SCOPES = r"country|species|system|ship|leader|army" #ambient_object|design|pop_faction|cosmic_storm|cosmic_storm_influence_field| # fleet| needs settings as last
 
 EFFECT_FOLDERS = [
 	"events",
@@ -146,16 +150,21 @@ actuallyTargets = {
 	# Format: key (pre match with group(0) or group(1) if present): array (search, replace) or str (if no group or one group)
 }
 # NOTE: Used list_traits_diff.py script for changed traits.
-
+is_decimal_re = re.compile(r"^-?\d+(?:\.\d+)?$")
 # --- Helper Lambda Functions ---
 def multiply_by_100(m):
 	" Multiply regexp string integer by hundred "
 	if isinstance(m, str):
 		prefix = ""
-		original_value = int(m)
 	else:
 		prefix = "".join(m.groups()[:-1])
-		original_value = int(m.groups()[-1])
+		m = m.groups()[-1]
+
+	if m[-1].isdigit() and is_decimal_re.match(m):
+		original_value = int(m)
+	else:
+		return f"{prefix} {m}"
+
 	if original_value < 100 and original_value > -100:
 		new_value = original_value * 100
 	else:
@@ -163,7 +172,7 @@ def multiply_by_100(m):
 	return f"{prefix} {int(new_value) if new_value == int(new_value) else new_value}"
 
 # def multiply_by_hundred_float(m):
-#	 return f"{m.group(1)} {int(float(m.group(2))*100)}"
+# 	 return f"{m.group(1)} {int(float(m.group(2))*100)}"
 
 def divide_by_100(m):
 	"""
@@ -173,10 +182,15 @@ def divide_by_100(m):
 	"""
 	if isinstance(m, str):
 		prefix = ""
-		original_value = int(m)
 	else:
 		prefix = "".join(m.groups()[:-1])
-		original_value = int(m.groups()[-1])
+		m = m.groups()[-1]
+
+	if m[-1].isdigit() and is_decimal_re.match(m):
+		original_value = int(m)
+	else:
+		return f"{prefix} {m}"
+
 	if original_value % 100 == 0:
 		new_value = original_value // 100 # floor division (or integer division), rounds the result down
 	else:
@@ -193,8 +207,57 @@ def leader_class_replacement(match):
 	final_class_string = " ".join(unique_classes)
 	return f"leader_class = {{ {final_class_string} }}"
 
+def flatten_and_comment(match: re.Match) -> str:
+	"""
+	Takes a multiline match object and does the following:
+	1. Preserves the indentation of the first line of the match.
+	2. Removes all newline characters.
+	3. Strips leading/trailing whitespace from each original line.
+	4. Collapses all multiple-space patterns into a single space.
+	5. Formats the result as a single, commented-out line.
+	"""
+	match = match.group(0)
+	indent = re.match(r'\s*', match)
+	indent = indent.group(0) if indent else ''
+	match = re.sub(r'\s+', ' ', match.strip())
+	return f"{indent}# {match}"
+
+
+# 4.2 'Corvus' (Infernals DLC)
+# Added prevent_automatic_genocidal_hostilities = yes in country def
+v4_2 = {
+
+}
+revert_v4_2 = {
+	"targetsR": [],
+	"targets3": {
+		r"# (fog_machine_auto_tracking = yes)": (["events","common/scripted_effects"], r"\1"),
+		r"\bis_fanatic_(%s) = (yes|no)\b" % VANILLA_ETHICS:
+			lambda p: ("NOT = { " if p.group(2) == "no" else "") +
+				"has_ethic = ethic_fanatic_" + p.group(1) +
+				(" }" if p.group(2) == "no" else ""),
+		r"\bis_infernal = yes\b": "has_trait = trait_infernal",
+	},
+	"targets4": {
+		r"\bis_genocidal_infernal = yes\b": "OR = { has_valid_civic = civic_scorched_earth has_valid_civic = civic_hive_scorched_earth }",
+		r"\bhas_anvil_building = yes\b": "OR = { has_active_building = building_volcanic_forge_1 has_active_building = building_volcanic_forge_2 has_active_building = building_volcanic_forge_3 }",
+		r"\bis_lithoid_or_infernal_empire = yes\b": "OR = { is_lithoid_empire = yes is_infernal_empire = yes }",
+	},
+}
+
 # LYRA ‘Vela’ (The Shadows of the Shroud DLC)
 # Global potential_shroudwalker_enclave trigger can used as dummy compat. (just used on init)
+# 4.1.6 removed uncapped districts
+# 	introduced is_\w+_district_uncapped triggers for is_uncapped
+# added pop:cat slave_unemployment2
+# TODO is_player_crisis has_crisis_level = crisis_cosmogenesis_level_5
+
+v4_1 = {
+
+}
+
+# This dictionary contains the reverse transformations for the provided v4_1 regexps.
+# The goal is to revert the text from the new format back to the original format.
 revert_v4_1 = {
 	"targets3": {
 		r"\bis_psionic_species = yes\b": "has_trait = trait_psionic",
@@ -242,7 +305,7 @@ revert_v4_1 = {
 
 TRAITS_TIER_2 = r"(adaptable|aggressive|agrarian_upbringing|architectural_interest|army_veteran|bureaucrat|butcher|cautious|eager|engineer|enlister|environmental_engineer|defence_engineer|politician|resilient|restrained|retired_fleet_officer|ruler_fertility_preacher|shipwright|skirmisher|trickster|unyielding)"
 TRAITS_TIER_3 = r"(annihilator|archaeo_specialization|armada_logistician|artillerist|artillery_specialization|border_guard|carrier_specialization|commanding_presence|conscripter|consul_general|corsair|crew_trainer|crusader|demolisher|dreaded|frontier_spirit|gale_speed|guardian|gunship_specialization|hardy|heavy_hitter|home_guard|interrogator|intimidator|juryrigger|martinet|observant|overseer|reinforcer|rocketry_specialization|ruler_fortifier|ruler_from_the_ranks|ruler_military_pioneer|ruler_recruiter|scout|shadow_broker|shipbreaker|slippery|surgical_bombardment|tuner|warden|wrecker)"
-JOBS_EXCLUSION_LIST = r"(?:calculator_biologist|calculator_physicist|calculator_engineer|soldier_stability|researcher_naval_cap|knight_commander)"
+JOBS_EXCLUSION_LIST = r"(?:calculator_(?:biologist|physicist|engineer)|(?:enforcer|soldier)_stability|researcher_naval_cap|knight_commander|necro_apprentice)"
 
 # PHONIX (BioGenesis DLC)
 # TODO
@@ -254,6 +317,13 @@ JOBS_EXCLUSION_LIST = r"(?:calculator_biologist|calculator_physicist|calculator_
 # starbase scope now supports controller
 # added triggered_planet_pop_group_modifier_for_species/triggered_planet_pop_group_modifier_for_all
 # general scope of job modifier now refers to planet
+# native triggers "is_being_purged" and "is_enslaved " are now scripted.
+# in tech prerequisites OR is now allowed
+# on create_leader traits Nr are now level of the leader (not level of the trait)
+v4_0 = {
+
+}
+
 # --- revert dictionary ---
 revert_v4_0 = {
 	"targetsR": [
@@ -425,7 +495,7 @@ revert_v4_0 = {
 			lambda p: dedent_block(p.group(2)), # just drop wrapper, keep original lines
 
 		# --- Reverting Misc Changes ---
-		r"(\n\t+planet_)structures(_(?:cost|upkeep)_mult = [\d.]+)\b": r"\1buildings\3\1districts\3",
+		r"(\n\t+planet_)structures(_(?:cost|upkeep)_mult = [\d.]+)\b": r"\1buildings\2\1districts\2",
 		# --- Reverting job_calculator expansion ---
 		# revert the three-specialised job_* lines back into a single job_calculator_add (if they are contiguous)
 		r"(?:\n\t+job_calculator_(?:biologist|engineer|physicist)_add = -?\d+){3}": [
@@ -470,7 +540,7 @@ v3_14 = {
 		[r"\bfruitful_(remove|add)_seed_to_critter\b", "SCRIPTED EFFECT REMOVED in v3.14"],
 	],
 	"targets3": {
-			r"\bis_pop_category = purge\b": (("T", "is_being_purged"), "is_being_purged = yes"),
+			# r"\bis_pop_category = purge\b": (("T", "is_being_purged"), "is_being_purged = yes"), IDK can and can't
 	},
 	"targets4": {
 	},
@@ -506,7 +576,7 @@ v3_13 = {
 				p.group(2) + ' ' + (p.group(3) + ' ' if p.group(3) else '')
 		],
 		# WARNING TODO: TEST only support species scope
-		r"(?:(\s+)(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?|is_species_class = (?:ROBOT|MACHINE))){2}": (("T", "is_robotic_species"), r"\1is_robotic_species = yes"),
+		r"(?:(\s+)(?:has_trait = \"?trait_(?:mechanical|machine_unit)\"?|is_species_class = (?:ROBOT|MACHINE))){2}": (NO_TRIGGER_FOLDER, r"\1is_robotic_species = yes"),
 		# Limited Fix the wrong scope is_robotic - supported scopes: leader, pop, pop_group, country
 		# r"((?:leader|pop_amount|controller|owner|overlord|country) = \{\s+)(\blimit = \{\s+)?(?:\bNO[RT] = \{\s+)?(\b(?:owner_)?species = \{\s+)is_robotic = (yes|no)(?(3)\s+\})":
 		#	 (NO_TRIGGER_FOLDER, r"\1\2is_robotic_species = \4"), just for repair
@@ -543,10 +613,7 @@ v3_12 = {
 	"targets3": {
 		r"\bset_gestalt_node_protrait_effect\b": "set_gestalt_node_portrait_effect",
 		r"(\w+modifier = )crucible_colony\b": r"\1gestation_colony",
-		r"\bhas_synthethic_dawn = yes": 'host_has_dlc = "Synthetic Dawn Story Pack"',  # 'has_synthetic_dawn', enable it later for backward compat.
-		r"\bhas_origin = origin_post_apocalyptic\b": (("T", "is_apocalyptic_empire"), "is_apocalyptic_empire = yes"),
-		r"\bhas_origin = origin_subterranean\b": (("T", "is_subterranean_empire"), "is_subterranean_empire = yes"),
-		r"\bhas_origin = origin_void_dwellers\b": (("T", "has_void_dweller_origin"), "has_void_dweller_origin = yes"),
+		# r"\bhas_synthethic_dawn = yes": 'host_has_dlc = "Synthetic Dawn Story Pack"',  # TODO 'has_synthetic_dawn', enable it later for backward compat.
 		r"\bhas_(?:valid_)?civic = civic_worker_coop\b": (("T", "is_worker_coop_empire"), "is_worker_coop_empire = yes"),
 		r"\btr_cybernetics_assembly_standards\b": "tr_cybernetics_augmentation_overload",
 		r"\btr_cybernetics_assimilator_crucible\b": "tr_cybernetics_assimilator_gestation",
@@ -559,6 +626,9 @@ v3_12 = {
 		r"\bgovernment_election_years_(add|mult)\b": r"election_term_years_\1",  # 3.12.3
 	},
 	"targets4": {
+		r"(?:(\s+)(?:has_origin = origin_post_apocalyptic(_machines)?|is_apocalyptic_empire = yes)\b){1,2}": (("T", "is_apocalyptic_empire"), r"\1is_apocalyptic_empire = yes"),
+		r"(?:(\s+)(?:has_origin = origin_subterranean(_machines)?|is_subterranean_empire = yes)\b){1,2}": (("T", "is_subterranean_empire"), r"\1is_subterranean_empire = yes"),
+		r"(?:(\s+)(?:has_origin = origin_void_(?:machines|dwellers)|has_void_dweller_origin = yes)\b){1,2}": (("T", "has_void_dweller_origin"), r"\1has_void_dweller_origin = yes"),
 		r"\bOR = \{\s*(?:has_ascension_perk = ap_mind_over_matter\s+has_origin = origin_shroudwalker_apprentice|has_origin = origin_shroudwalker_apprentice\s+has_ascension_perk = ap_mind_over_matter)\s*\}": (("T", "has_psionic_ascension"), "has_psionic_ascension = yes"),
 		r"\s(?:\bNO[RT]|\bOR) = \{\s*(?:has_(?:valid_)?civic = \"?civic_death_cult(?:_corporate)?\"?\s*?){2}\}": [
 			r"\b(NO[RT]|OR) = \{\s*(?:has_(?:valid_)?civic = \"?civic_death_cult(?:_corporate)?\"?\s*?){2}\}", (NO_TRIGGER_FOLDER,
@@ -613,14 +683,11 @@ v3_11 = {
 		r"\badd_trait = leader_trait_(maniacal)": r"add_or_level_up_veteran_trait_effect = { TRAIT = leader_trait_\1 }",
 	},
 	"targets4": {
-		r"\bany_country = \{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [
-			r"any_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))",
-			r"any_galcom_member = \1",
-		],
-		r"\s(?:every|random|count)_country = \{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council)": [
-			r"(\s(?:every|random|count))_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member|is_part_of_galactic_council))",
+		r"\bany(?:_playable)?_country = (\{[^{}#]*(?:position_on_last_resolution|is_galactic_community_member = yes|is_part_of_galactic_council))":
+			r"any_galcom_member = \1"
+		,
+		r"(\s(?:every|random|count))(?:_playable)?_country = (\{[^{}#]*limit = \{\s*(?:position_on_last_resolution|is_galactic_community_member = yes|is_part_of_galactic_council))":
 			r"\1_galcom_member = \2",
-		],
 		r"\b(?:(?:is_planet_class = pc_(?:city|relic)\b|merg_is_(?:arcology|relic_world) = yes)\s*?){2}": (
 			NO_TRIGGER_FOLDER,
 			"is_urban_planet = yes",
@@ -847,11 +914,8 @@ v3_8 = {
 			r"((\n\t+)(?:is_country_type = default|merg_is_default_empire = yes|is_fallen_empire = yes|is_country_type_with_subjects = yes)){2,3}",
 			(("T", "is_default_or_fallen"), r"\2is_default_or_fallen = yes"),
 		],
-		r"(\s|\.)(?:owner_)?species = \{\s+(?:has_trait = trait_hive_mind|is_hive_species = yes)\s+\}": (NO_TRIGGER_FOLDER, lambda p: (
-			f" = {{ is_hive_species = yes }}" if p.group(1) == '.'
-			else f"{p.group(1)}is_hive_species = yes")),
 		# TODO (?:limit = \{\s+)?
-		r"((?:species|pop|pop_group) = \{\s+(NOT = \{\s*)?has_trait = trait_hive_mind\s*\}(?(2)\s*\}))": [
+		r"((?:(?:\s|\.)species|pop|pop_group) = \{\s+(NOT = \{\s*)?has_trait = trait_hive_mind\s*\}(?(2)\s*\}))": [
 			r"(NOT = \{\s*)?has_trait = trait_hive_mind(?(1)\s*\})", (NO_TRIGGER_FOLDER,
 			lambda p: "is_hive_species = " + ("no" if p.group(1) else "yes"))
 		],
@@ -1062,10 +1126,7 @@ v3_3 = {
 		],
 	],
 	"targets3": {
-		r"\s+building(_basic_income_check|_relaxed_basic_income_check|s_upgrade_allow) = (?:yes|no)\n?": (
-			"common/buildings",
-			"",
-		),
+		r"\s+building(_basic_income_check|_relaxed_basic_income_check|s_upgrade_allow) = (?:yes|no)\n?": ("common/buildings", ""),
 		# r"\bGFX_ship_part_auto_repair": (["common/component_sets", "common/component_templates"], 'GFX_ship_part_ship_part_nanite_repair_system'), # because icons.gfx
 		r"\b(country_election_)influence_(cost_mult)": r"\1\2",
 		r"\bwould_work_job": ("common/game_rules", "can_work_specific_job"),
@@ -1089,10 +1150,6 @@ v3_3 = {
 			r"\bvalue\b", ("common/ethics", "base"),
 		],
 		# r"\n\s+NO[RT] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[RT] = \{\s*[^{}#\n]+\s*\}": [r"(\t+)NO[RT] = \{\s*([^{}#\n]+)\s*\}\s*?\n\s*NO[RT] = \{\s*([^{}#\n]+)\s*\}", r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}"], not valid if in OR
-		r"\bany_\w+ = \{[^{}]+?\bcount\s*[<=>]+\s*[^{}\s]+?\s+[^{}]*\}": [
-			r"\bany_(\w+) = \{\s*(?:([^{}]+?)\s+(\bcount\s*[<=>]+\s*[^{}\s]+)|(\bcount\s*[<=>]+\s*[^{}\s]+)\s+([^{}]*))\s+\}",
-			r"count_\1 = { limit = { \2\5 } \3\4 }",
-		],  # too rare!? only simple supported TODO
 	},
 }
 # HERBERT
@@ -1324,12 +1381,10 @@ v3_1 = {
 			r"\1coords_from = \2",
 		],
 		r"\s+modifier = \{\s*mult\b": [r"\bmult\b", "factor"],
+		r"(?:(\s+)has_(?:valid_)?civic = \"?civic_(?:corporate_|hive_|machine_)?catalytic_processing\"?){3,4}": (("T", "is_catalytic_empire"), r"\1is_catalytic_empire = yes"),
+		r"(?:(\s+)has_(?:valid_)?civic = \"?civic_(?:corporate_)?crafters\"?){2}": (("T", "is_crafter_empire"), r"\1is_crafter_empire = yes")
 	},
 }
-if code_cosmetic and not only_warning:
-	v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:corporate_)?crafters){2}" ] = (("T", "is_crafter_empire"), r"\1is_crafter_empire = yes")
-	# v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:pleasure_seekers|corporate_hedonism)){2}" ] = (("T", "is_pleasure_seeker"), r"\1is_pleasure_seeker = yes")
-	v3_1["targets4"][r"(?:(\s+)has_(?:valid_)?civic = civic_(?:corporate_|hive_|machine_)?catalytic_processing){3,4}" ] = (("T", "is_catalytic_empire"), r"\1is_catalytic_empire = yes")
 
 # 3.0 DICK (Nemesis DLC)
 # removed ai_weight for buildings except branch_office_building = yes
@@ -1409,12 +1464,13 @@ if basic_fixes:
 		"targetsR": [],
 		# targets2 = {
 		#   r"MACHINE_species_trait_points_add = \d" : ["MACHINE_species_trait_points_add ="," ROBOT_species_trait_points_add = ",""],
-		#   r"job_replicator_add = \d":["if = {limit = {has_authority = \"?auth_machine_intelligence\"?} job_replicator_add = ", "} if = {limit = {has_country_flag = synthetic_empire} job_roboticist_add = ","}"]
+		#   r"job_replicator_add = \d":["if = {limit = {is_machine_empire = yes} job_replicator_add = ", "} if = {limit = {has_country_flag = synthetic_empire} job_roboticist_add = ","}"]
 		# }
 		"targets3": {
 			r"\bstatic_rotation = yes\s*": ("common/component_templates", ""),
 			r"\bowner\.(?:owner_)?species\b": "owner_species",
-			r"\bplanet\.owner\b": "planet_owner", # NOTE: Vanilla v4.0 does't use this
+			# r"\bis_controlled_by = owner\b": "is_occupied_flag = no", # TODO Just valid for planet but applies for: planet ship fleet starbase astral_rift
+			r"\bplanet\.owner\b": "planet_owner", # NOTE: Vanilla v4.0 does't use this for unknown reason
 			### < 2.2
 			# r"\bhas_job = unemployed\b": "is_unemployed = yes",
 			### somewhat older
@@ -1426,11 +1482,9 @@ if basic_fixes:
 			r"\bhas_authority = (\"?)auth_machine_intelligence\1\b": (("T", "is_machine_empire"), "is_machine_empire = yes"),
 			r"\bhas_authority = (\"?)auth_hive_mind\1\b": (("T", "is_hive_empire"), "is_hive_empire = yes"),
 			r"\bhas_authority = (\"?)auth_corporate\1\b": (("T", "is_megacorp"), "is_megacorp = yes"),
-			r"\bis_country\b": "is_same_empire",
-			r"\bis_same_value = ([\w\.:]+(?:controller|(?:space_)?owner)(?:\.overlord)?(?:[\s}]+|$))": r"is_same_empire = \1",
-			r"((?:controller|owner|overlord|country|federation_ally) = \{|(?:is_ai|has_federation|is_federation_leader|is_at_war|overlord|subject) = (?:yes|no)|has_country_flag = \w+)\s+is_same_value\b": r"\1 is_same_empire",
-			r"(^\b|[^\._])owner = \{\s*is_same_(?:empire|value) = ([\w\.:]+)\s*\}": r"\1is_owned_by = \2",
+			r"(^\b|[^\._])owner = \{\s*is_same_(?:empire|value) = ([\w\.:]+)\s*\}": (re.compile(r"^(?!common/patrons/psionic_auras)"), r"\1is_owned_by = \2"),
 			r"(?<!from = \{ )\b(is_robotic)_species =": ([re.compile(r"common/species_rights.*"), "common/armies"], r"\1 ="),
+			r"is_fanatical =": (NO_TRIGGER_FOLDER, "is_fanatic ="), # Save since 3.0 - fully removed in v4.2
 		},
 		"targets4": {
 			### < 3.0
@@ -1444,119 +1498,39 @@ if basic_fixes:
 				),
 			],
 			r"\bhas_ethic = \"?ethic_(?:fanatic_)?(%s)\"?\s+?has_ethic = \"?ethic_(?:fanatic_)?\1\"?" % VANILLA_ETHICS: (NO_TRIGGER_FOLDER, r"is_\1 = yes"),
+			# r"^(\t+)((?:(?:%s)[._])?(?:%s) = {)((\n)?[ \t]+?)(NOT = \{)\s+([^:\n]+?)\s+(\}(?(4)\n\1| )\})" % (SCOPES, SCOPES): r"\1\5\3\2 \6 \7",
 			### Boolean operator MERGE
-			# NAND <=> OR = { NOT
-			r"((\n\t+)OR = \{(?:\2\tNOT = \{[^{}#]*?\}){2,7}\2\})$": [
-				r"^(\s+)OR = \{(\s+)NOT = \{\s+([^{}#]*?)\s*\}(?(3)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?(?(5)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?(?(7)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?(?(9)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?(?(11)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?(?(13)(\s+)NOT = \{\s*([^{}#]*?)\s*\})?",
-				r"\1NAND = {\2\3\4\5\6\7\8\9\10\11\12\13\14\15",
-			],  # up to 7 items (sub-trigger)
-			# NOR <=> AND = { NOT
-			r"\n\t+AND = \{\s(?:\s+NOT = \{\s*(?:[^{}#]+|\w+ = {[^{}#]+\})\s*\}){2,7}\s+\}?": [
-				r"(\n\t+)AND = \{\s*?(?:(\n\s+)NOT = \{\s*([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s+\})(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\4(?(4)(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\7(?(7)(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\10(?(10)(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\13(?(13)(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\16(?(16)(?=((\2)?NOT = \{\s+([^{}#]+?|\w+ = \{[^{}#]+\s*\})\s*\})?)\19)?)?)?)?)?\1\}",
-				r"\1NOR = {\2\3\5\6\8\9\11\12\14\15\17\18\20\21\1}",
-			],  # up to 7 items (sub-trigger)
-			# NAND <=> NOT = { AND
-			r"^\s+NO[RT] = \{\s*AND = \{[^{}#]*?\}\s*\}": [
-				r"(\t*)NO[RT] = \{\s*AND = \{\t*\n(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?(?:\t([^{}#\n]+\n))?\s*\}\t*\n",
-				r"\1NAND = {\n\2\3\4\5",
-			],  # only 4 items (sub-trigger)
-			# NOR <=> NOT = { OR (only sure if base is AND)
-			r"^\s+NO[RT] = \{\s*?OR = \{\s*(?:\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\s+?){2,5}\}\s*\}": [
-				r"\bNO[RT] = \{\n?(\s+?)OR = \{\s*(\1\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\n)\t(\1\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\n)\t(?(3)(\1\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\n)?\t(?(4)(\1\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\n)?\t(?(5)(\1\w+ = (?:[^{}#\s=]+|\{[^{}#\s=]+\s*\})\n)?)))\s*\}\s",
-				r"NOR = {\n\2\3\4\5\6",
-			],  # only right indent for 5 items (sub-trigger)
-			# NOR <=> (AND) = { NOT (TODO a lot of BLIND MATCHES?)
-			r"(?<!\tOR) = \{(\s(?:[^{}#\n]+\n)*(?:\s+NO[RT] = \{(?:[^\n#]+|[^{}#]+)\}){2})": [ # \s+\} (just NOT version, extended version in cosmetic)
-				r"(\n\t+)NO[RT] = \{\s+([^\n#]+?|[^{}#]+?)\s+\}\s+NO[RT] = \{\s+([^\n#]+?|[^{}#]+?)\s+\}$", (re.compile(r"^(?!common/governments)\w"),
-				r"\1NOR = {\1\t\2\1\t\3\1}"
-			)],  # only 2 items (sub-trigger)
-			# NOR <=> 'no/NOT' (only not in OR)
-			# 'no' at start
-			r"(?<!\tOR) = \{\n\t+(?:[^{}#\n]+\n){0,6}\s*\w+ = no\s+NO[RT] = \{(?:[^\n#]+|[^{}#]+)\}": [
-				r"(\n\t+)(\w+) = no\s+NO[RT] = \{\s+([\s\S]+?)\s+\}$",
-				r"\1NOR = {\1\t\2 = yes\1\t\3\1}"],
-			# 'no' at end
-			r"(?<!\tOR) = \{\n\t+(?:[^{}#\n]+\n){0,6}\s+NO[RT] = \{(?:[^\n#]+|[^{}#]+)\}\s+\w+ = no\b": [
-				r"(\n\t+)NO[RT] = \{\s+([^{}#]+?)\s+\}\s+(\w+) = no$",
-				r"\1NOR = {\1\t\2\1\t\3 = yes\1}"],
-			# NAND <=> OR = { 'NO'/'NOT' (simple faster)
-			# r"\bOR = \{\s*(?:(?:NOT = \{[^{}#]+?|[\w:@.]+ = \{\s+\w+ = no)\s+?\}\s+?){2}\s*\}$": [
-			# 	r"OR = \{(\s*)(?:NOT = \{\s*([^{}#]+?)|((?!(?:any|count)_)[\w:@.]+ = \{\s+\w+ = )no)(\s+)\}\s+(?:NOT = \{\s*([^{}#]+?)|((?!(?:any|count)_)[\w:@.]+ = \{\s+\w+ = )no)(\s+)\}",
+			# TODO TEST if this last regexp successfully implemented in logic_optimizer
+			# NAND <=> OR = { 'NO'/'NOT' (extended) 2 items
+			# r"((\n\t+)OR = \{(?:\2\t(?:NO[RT] = \{\s+(?:[^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|[\w:@.]+ = \{\s+\w+ = no\s+\}|\w+ = no)){2})\2\}": [
+			# 	r"OR = \{(\s*)(?:NO[RT] = \{\s*((\w+ = \{)?[^{}#]+?(?(3)\s+?\}))\s+?\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no)(?(5)(\s+?\}))\s+(?:NO[RT] = \{\s*((\w+ = \{)?[^{}#]+?(?(8)\s+?\}))\s+?\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no)(?(10)(\s+?\}))$",
 			# 	lambda p: "NAND = {"
-			# 		+p.group(1)
-			# 		+ (
-			# 			p.group(2) if isinstance(p.group(2), str) and p.group(2) != "" else f"{p.group(3)}yes{p.group(4)}}}"
-			# 		)fr
-			# 		+p.group(1)
-			# 		+(
-			# 			p.group(5) if isinstance(p.group(5), str) and p.group(5) != "" else f"{p.group(6)}yes{p.group(7)}}}"
+			# 	+ p.group(1)
+			# 	+ (
+			# 		(f"OR = {{{p.group(1)}\t{p.group(2)}{p.group(1)}}}" # Is it a multiline NOR?
+			# 			if re.search('\n',p.group(2)) else p.group(2)
 			# 		)
-			# ],
-			# NAND <=> OR = { 'NO'/'NOT' (extended)
-			r"((\n\t+)OR = \{(?:\2\t(?:NO[RT] = \{\s+(?:[^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|[\w:@.]+ = \{\s+\w+ = no\s+\}|\w+ = no)){2})\2\}": [
-				r"OR = \{(\s*)(?:NO[RT] = \{\s*((\w+ = \{)?[^{}#]+?(?(3)\s+?\}))\s+?\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no)(?(5)(\s+?\}))\s+(?:NO[RT] = \{\s*((\w+ = \{)?[^{}#]+?(?(8)\s+?\}))\s+?\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no)(?(10)(\s+?\}))$",
-				lambda p: "NAND = {"
-				+ p.group(1)
-				+ (
-					(f"OR = {{{p.group(1)}\t{p.group(2)}{p.group(1)}}}" # Is it a multiline NOR?
-						if re.search('\n',p.group(2)) else p.group(2)
-					)
-					if p.group(2)
-					else p.group(4) + "yes" + (p.group(6) if p.group(5) else "")
-				)
-				+ p.group(1)
-				+ (
-					(f"OR = {{{p.group(1)}\t{p.group(7)}{p.group(1)}}}" # Is it a multiline NOR?
-						if re.search('\n',p.group(7)) else p.group(7)
-					)
-					if p.group(7)
-					else p.group(9) + "yes" + (p.group(11) if p.group(10) else "")
-				),
-			],  # NAND = {\1\2\4yes\6\1\7\9yes\11
-			# NAND <=> OR = { '(NO)'/'AND(\1NO/NOR)'
-			# r"((\n\t+)OR = \{\s+(\w+ = )no\s+AND = \{(\s+)\3yes\s+(?:NO[RT] = \{\s+(?:[^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|[\w:@.]+ = \{\s+\w+ = no\s+\}|\w+ = no)\2\t\})\2\}": [
-				# r"OR = \{(\s+)(\w+ = )no\s+AND = \{(\s+)\2yes\s+(?:NO[RT] = \{\s+([^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no)(?(6)(\s+?\}))\1\}" (simpler version)
-			r"((\n\t+)OR = \{\s+(?:(\w+ = )no\s+AND = \{\s+\3yes|NOT = \{\s+(exists = \w+)\s+}\s+AND = \{\s+\4)\s+(?:NO[RT] = \{\s+(?:[^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|[\w:@.]+ = \{\s+\w+ = no\s+\}|\w+ = no|\w+ = \{\s+NO[RT] = \{[^{}#]+?\}\s+\})\2\t\})\2\}": [
-				r"OR = \{(\s+)(?:(\w+ = )no\s+AND = \{\s+\2yes|NOT = \{\s+(exists = \w+)\s+}\s+AND = \{\s+\3)\s+(?:NO[RT] = \{\s+([^{}#]+?|\w+ = \{[^{}#]+?\})\s+\}|(((?!(?:any|count)_)[\w:@.]+ = \{)?[^{}#]+? = )no|(\w+ = \{)\s+NO[RT] = \{(\s+[^{}#]+?)\}\s+\})(?(5)(\s+?\}))\1\}$",
-				lambda p: "NAND = {" + p.group(1) +
-				(p.group(2) + "yes"
-				if p.group(2)
-				else p.group(3))
-				+ p.group(1) +
-				(
-					(f"OR = {{{p.group(1)}\t{p.group(4)}{p.group(1)}}}" # Is it a multiline NOR?
-						if re.search('\n',p.group(4)) else p.group(4)
-					)
-					if p.group(4)
-					else (
-						dedent_block(p.group(5) + "yes" + (p.group(9) if p.group(6) else ""))
-						if p.group(5)
-						else (
-							f"{p.group(7)}{p.group(1)}\t" +
-							(f"OR = {{{dedent_block(p.group(8))}}}{p.group(1)}}}" # Is it a multiline NOR? {p.group(1)}\t\t
-								if re.search('\n',p.group(8)) else p.group(8) + p.group(1) + "}"
-							)
-							if p.group(7)
-							else ""
-						)
-					)
-				),
-			],  # NAND = {\1\2yes\1\3\4yes # NAND = {\1\2yes\1\7\1\tOR\8\1}
-			# MERGE UNNECESSARY SCOPING (simplify 2 pairs) - extended version (3 pairs) is cosmetic
-			r"^((\t+)(?:%s|N?AND|N?OR) = \{(\s+(?:%s)) = \{\s+[^#\n]+?\s*\}\3 = \{\s+(?:[^{}#\t\n]+?|\w+ = \{\s+[^{}#]+?\s*\})\s*\})\n?\2\}" % (SCOPES, SCOPES): [
-				r"(\w+ = \{)(\s+)(%s) = \{\s+([^#\n]+?)\s*\}\s+\3 = \{\s+([^{}#\t\n]+?|\w+ = \{\s+[^{}#]+?\s*\})\s+\}" % SCOPES,
-				r"\3 = {\2\1\2\t\4\2\t\5\2}",
-			],
-			r"(\n\t+)NOR = \{\s+(\w+ = )yes\s+(\w+ = )yes\s+\}(\s+\}|\s+\w+ = yes)": r"\1\2no\1\3no\4",
+			# 		if p.group(2)
+			# 		else p.group(4) + "yes" + (p.group(6) if p.group(5) else "")
+			# 	)
+			# 	+ p.group(1)
+			# 	+ (
+			# 		(f"OR = {{{p.group(1)}\t{p.group(7)}{p.group(1)}}}" # Is it a multiline NOR?
+			# 			if re.search('\n',p.group(7)) else p.group(7)
+			# 		)
+			# 		if p.group(7)
+			# 		else p.group(9) + "yes" + (p.group(11) if p.group(10) else "")
+			# 	),
+			# ],  # NAND = {\1\2\4yes\6\1\7\9yes\11
 			### END boolean operator MERGE
 			r"\{\s+owner = \{\s*is_same_(?:empire|value) = ([\w\.:]+)\s*\}\s*\}": r"{ is_owned_by = \1 }",
 			r"(?:(\s+)is_country_type = (?:awakened_)?fallen_empire\b){2}": (("T", "is_fallen_empire"), r"\1is_fallen_empire = yes"),
 			r"(?:(\s+)is_country_type = (?:default|awakened_fallen_empire)\b){2}": (("T", "is_country_type_with_subjects"), r"\1is_country_type_with_subjects = yes"),
-			r"(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+(?:has_authority = \"?auth_machine_intelligence\"?|has_country_flag = synthetic_empire|is_machine_empire = yes)\b": (("T", "is_synthetic_empire"), "is_synthetic_empire = yes"),
+			r"(?:is_machine_empire = yes|has_country_flag = synthetic_empire|is_machine_empire = yes)\s+(?:is_machine_empire = yes|has_country_flag = synthetic_empire|is_machine_empire = yes)\b": (("T", "is_synthetic_empire"), "is_synthetic_empire = yes"),
 			r'(?:(\s+)has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm)\"?){3}': (("T", "is_homicidal"), r"\1is_homicidal = yes"),
 			r"(?:(\s+)has_(?:valid_)?civic = \"?civic_(?:fanatic_purifiers|machine_terminator|hive_devouring_swarm|barbaric_despoilers)\"?){4}": (("T", "is_unfriendly"), r"\1is_unfriendly = yes"),
 			r"is_homicidal = yes\s+has_(?:valid_)?civic = \"?barbaric_despoilers\"?": "is_unfriendly = yes",
-			r"NOT = \{\s*(check_variable = \{\s*which = \"?\w+\"?\s+value) = ([^{}#\s=])\s*\}\s*\}": r"\1 != \2 }",
+			# r"NOT = \{\s*(check_variable = \{\s*which = \"?\w+\"?\s+value) = ([^{}#\s=])\s*\}\s*\}": r"\1 != \2 }", ported
 			# r"change_species_characteristics = \{\s*?[^{}\n]*?
 			r"[\s#]+new_pop_resource_requirement = \{[^{}]+\}\t*": "",
 			# Near cosmetic
@@ -1581,25 +1555,32 @@ if basic_fixes:
 				+ dedent_block(f"{(p.group(3) or p.group(7))}")
 			],
 			# (?:%s)_(?:(?:playable_)?country|federation_ally) % VANILLA_PREFIXES
-			r"\b(?:controller|owner|overlord|country|federation_ally) = \{[^{}#]*?(?:limit = \{\s*)?(?:NO[RT] = \{)?\s*is_same_value\b":
-				["is_same_value", "is_same_empire"],
 			r"\b(%s)_country = (\{[^{}#]*?(?:limit = \{\s*)?(?:has_event_chain|is_ai = no|is_country_type = default|has_policy_flag|(?:is_zofe_compatible|merg_is_default_empire) = yes))" % VANILLA_PREFIXES:
 				r"\1_playable_country = \2", # Invalid for FE in v4.0 is_galactic_community_member|is_part_of_galactic_council
 			r"^(\s+)(?:is_artificial = yes\s+(?:has_ringworld_output_boost = yes|is_planet_class = (?:pc_ringworld_habitable(_damaged)?|pc_shattered_ring_habitable|pc_habitat|pc_cybrex|pc_cosmogenesis_world))|(?:has_ringworld_output_boost = yes|is_planet_class = (?:pc_ringworld_habitable(_damaged)?|pc_shattered_ring_habitable|pc_habitat|pc_cybrex|pc_cosmogenesis_world))\s+is_artificial = yes)": r"\1is_artificial = yes",
 			r"(species = \{\s+(?:\w+ = \{\s+[^{}#]*)?is_robotic)_species =": r"\1 =", # TODO long (block) version
-			r"[\s.](?:owner_)?species = \{\s+is_robotic(?:_species)? = (?:yes|no)\s+\}": [r"(\s|\.)(?:owner_)?species = \{\s+is_robotic(?:_species)? = (yes|no)\s+\}", (NO_TRIGGER_FOLDER, lambda p: (
-					f" = {{ is_robotic_species = {p.group(2)} }}" if p.group(1) == '.'
-					else f"{p.group(1)}is_robotic_species = {p.group(2)}")
-			)],
-			r"[\s.](?:owner_)?species = \{\s+(?:is_lithoid = yes|is_archetype = LITHOID)\s+\}": [r"(\s|\.)(?:owner_)?species = \{\s+(?:is_lithoid = yes|is_archetype = LITHOID)\s+\}", (NO_TRIGGER_FOLDER, lambda p: (
-					f" = {{ is_lithoid_empire = yes }}" if p.group(1) == '.'
-					else f"{p.group(1)}is_lithoid_empire = yes")
-			)],
+			# owner_species not valid
+			# v3_8
+			r"(\s|\.)species = \{\s+(?:has_trait = trait_hive_mind|is_hive_species = (yes|no))\s+\}": (NO_TRIGGER_FOLDER, lambda p: (
+				f" = {{ is_hive_species = {p.group(2)} }}" if p.group(1) == '.' else f"{p.group(1)}is_hive_species =  {p.group(2)}"
+				if p.group(2) else f" = {{ is_hive_species = yes }}" if p.group(1) == '.' else f"{p.group(1)}is_hive_species = yes"
+			)),
+			# owner_species not valid
+			r"(\s|\.)species = \{\s+is_robotic(?:_species)? = (yes|no)\s+\}": (NO_TRIGGER_FOLDER, lambda p: (
+				f" = {{ is_robotic_species = {p.group(2)} }}" if p.group(1) == '.' else f"{p.group(1)}is_robotic_species = {p.group(2)}"
+			)),
+			r"(\s|\.)owner_species = \{\s+(?:is_lithoid = (yes|no)|is_archetype = LITHOID)\s+\}": (NO_TRIGGER_FOLDER, lambda p: (
+				f" = {{ is_lithoid_empire = {p.group(2)} }}" if p.group(1) == '.' else f"{p.group(1)}is_lithoid_empire = {p.group(2)}"
+				if p.group(2) else f" = {{ is_lithoid_empire = yes }}" if p.group(1) == '.' else f"{p.group(1)}is_lithoid_empire = yes"
+			)),
 			r"(?:(?:(\s+)(?:is_planet_class = (?:pc_ringworld_habitable(?:_damaged)?|pc_cybrex|pc_cosmogenesis_world)|has_ringworld_output_boost = yes)\b){2,4}|\s+is_planet_class = pc_habitat\b){2}": r"\1is_artificial = yes",
-			# Temp back fix
+			# TEMP BACK FIX
+			# r"(\n\t+)NOR = \{\s+(\w+ = )yes\s+(\w+ = )yes\s+\}(\s+\}|\s+\w+ = yes)": r"\1\2no\1\3no\4",
+			# r'=\s*(?:\"[^\"]+\n[^\"]*\"|@\\?\[[^\[\]]+\])': lambda p: re.sub(r"\s+", " ", p.group(0)),
 			# Just add on the first place if there is no is_owned_by
 			# r"(\s+)any_system_colony = \{\1\t?(?!\s*has_owner = yes)([^}#]+\})": r"\1any_system_colony = {\1\thas_owner = yes\1\t\2",
 			# r"\b((?:every|random|count|ordered)_system_colony = \{(\s+)[^}#]*limit = \{)\2(?!\s*has_owner = yes)([^}#]*?\})": r"\1\2\thas_owner = yes\2\3",
+			# r"\bhas_owner = yes\s+exists = owner\b": "has_owner = yes",
 		}
 	}
 # End basic fixes
@@ -1611,7 +1592,7 @@ exclude_paths = {
 	"component_templates",
 	"notification_modifiers",
 	# "inline_scripts",
-	# "name_lists", there are few fixes
+	"name_lists", # TODO there are few fixes
 	# "on_actions", why?
 	"scripted_variables",
 	"start_screen_messages",
@@ -1622,8 +1603,10 @@ exclude_paths = {
 # 1. Define a list of version configurations, sorted from newest to oldest.
 # Each item is a tuple: (version_threshold_float, data_dictionary_for_that_version)
 version_data_sources = [
-	# (4.1, v4_1),
-	# (4.0, v4_0),
+	(4.3, v4_3),
+	(4.2, v4_2),
+	(4.1, v4_1),
+	(4.0, v4_0),
 	(3.99, v3_14),
 	(3.98, v3_13),
 	(3.97, v3_12),
@@ -1641,6 +1624,7 @@ version_data_sources = [
 	(3.0,  v3_0),
 ]
 revert_version_data_sources = [
+	(4.2, revert_v4_2),
 	(4.1, revert_v4_1),
 	(4.0, revert_v4_0),
 ]
@@ -1658,87 +1642,292 @@ def _apply_version_data_to_targets(source_data_dict):
 	if "targets4" in source_data_dict:
 		actuallyTargets["targets4"].update(source_data_dict["targets4"])
 
-from collections import Counter
-
-def sort_pre_triggers(trigger_block: re.Match) -> str:
+def sort_pre_triggers(trigger_suffix: str, trigger_block: str, parent_event: str) -> str:
 	"""
 	Sorts Stellaris planet pre_triggers based on an estimated priority list.
 	"""
+	logger.debug(f"Sorting pre_triggers for parent '{parent_event}' with suffix '{trigger_suffix}'")
 	# Define the estimated priority of triggers. Lower number = higher priority.
-	# Triggers not in this list will be placed at the end, alphabetically.
-	trigger_suffix = trigger_block.group(1)
-	trigger_block = trigger_block.group(2)
+	# Base priorities applicable to all scopes
 	priority_list = {
-		'has_owner': 1,
+		'has_owner': 1
+	}
+	# Scope-specific priorities
+	planet_priority_list = {
 		'is_homeworld': 2,
 		'is_capital': 3,
-		'original_owner': 4,
 		'is_occupied_flag': 5,
-		'has_ground_combat': 6, # Checks a complex, temporary state
-		'is_ai': 7, # Indirect scope, more expensive
+		'is_ai': 6,				# Indirect scope, more expensive
+		'has_ground_combat': 7, # Checks a complex, temporary state
+		'original_owner': 8,
 	}
-	# Priority list for pop/job scopes (possible_pre_triggers)
+	system_priority_list = {
+		'is_capital': 3,
+		'is_occupied_flag': 5,
+	}
+	starbase_priority_list = {
+		'is_occupied_flag': 5,
+	}
+	leader_priority_list = {
+		'is_idle': 5,
+	}
+	# pop/job/pop_group_event scopes
 	pop_priority_list = {
-		'has_planet': 1,      # Most fundamental check
-		'is_sapient': 2,      # Core species flag
-		'has_owner': 3,       # Possible indirect scope check
-		'is_being_assimilated': 4, # Status, likely simple boolean
-		'is_being_purged': 5, # bad, scripted since v4.0
-		'is_enslaved': 6,     # very bad, scripted since v4.0
+		'has_planet': 2,			# Most fundamental check
+		'is_sapient': 3,			# Core species flag
+		'is_robotic': 4,			# since v4.0
+		'is_being_assimilated': 5,	# Status, likely simple boolean
+		'is_being_purged': 6,		# since v4.0 also scripted
+		'is_enslaved': 7,			# since v4.0 also scripted
 	}
-	# Check for the more specific 'possible_pre_triggers' first
-	if trigger_suffix.startswith("possible_"):
-		priority_list = pop_priority_list
-	elif trigger_suffix.startswith("can_join_"):
-		priority_list = pop_priority_list
+	# Check for specific 'pre_triggers'
+	if parent_event.startswith("planet"):
+		priority_list.update(planet_priority_list)
+	elif parent_event.startswith("pop_"): # or trigger_suffix.startswith(("possible_","can_join_"))
+		priority_list.update(pop_priority_list)
+	elif parent_event.startswith("system"):
+		priority_list.update(system_priority_list)
+	elif parent_event.startswith("starbase"):
+		priority_list.update(starbase_priority_list)
+	elif parent_event.startswith("leader"):
+		priority_list.update(leader_priority_list)
 
 	trigger_suffix = f"\t{trigger_suffix} = {{\n\t\t"
 	# 1. Extract individual trigger lines like 'key = value'
-	lines = re.findall(r'(\w+ = (?:yes|no)\b)', trigger_block)
+	lines = [line.strip() for line in trigger_block.strip().split('\n') if line.strip() and not line.strip().startswith('#')]
 	# 2. Process lines into a structured list of dictionaries ONCE
-	# Each item now contains the pre-calculated key and the original line
+	# Each item contains the pre-calculated key and the original line
+	all_keys = set()
 	unique_trigger_data = []
-	seen_lines = set()
-	removed_duplicates = []
-
-	# Remove completely identical lines first
+	# 3. Dupe check
 	for line in lines:
-		normalized_line = line.strip()
-		if normalized_line in seen_lines:
-			removed_duplicates.append(normalized_line)
-			continue # Skip this duplicate line
-		seen_lines.add(normalized_line)
-		# The split and strip operation now happens only ONCE per line
-		key = normalized_line.split('=')[0].strip()
-		unique_trigger_data.append({'key': key, 'original_line': normalized_line})
-
-	# --- Check for duplicate trigger keys ---
-	if removed_duplicates:
-		# Use Counter to show how many of each were removed
-		removed_counts = Counter(removed_duplicates)
-		for line, count in removed_counts.items():
-			 logger.info(f"‼️ HINT: Removed {count} identical duplicate trigger(s): '{line}'")
-
-	# Now, perform checks on the cleaned data
-	all_keys = [trigger['key'] for trigger in unique_trigger_data]
-
-	# Check for conflicting trigger keys (e.g., is_capital = yes AND is_capital = no)
-	key_counts = Counter(all_keys)
-	conflicting_keys = [key for key, count in key_counts.items() if count > 1]
-	if conflicting_keys:
-		logger.warning(f"‼️ HINT: Conflicting triggers found (same key, different values): {conflicting_keys}")
-	# Check for unknown triggers
-	unknown_triggers = [key for key in key_counts if key not in priority_list]
-	if unknown_triggers:
-		logger.warning(f"⚠️The following triggers do not appear to be valid pre-triggers: {unknown_triggers}")
-
+		key = line.split('=')[0].strip()
+		if key in all_keys:
+			logger.warning(f"‼️ HINT: Removed duplicate pre-trigger: '{line}'")
+			continue
+		all_keys.add(key)
+		unique_trigger_data.append({'key': key, 'original_line': line})
+	# 4. Check for unknown triggers
+	for key in all_keys:
+		if key not in priority_list:
+			logger.warning(f"⚠️Trigger {key} do not appear to be a valid pre-trigger.")
+	# (Triggers not in this list will be placed at the end, alphabetically.)
 	sorted_trigger_data = sorted(unique_trigger_data, key=lambda trigger: (
-		priority_list.get(trigger['key'], 99), 
+		priority_list.get(trigger['key'], 99),
+		trigger['key']
+	))
+	return trigger_suffix + "\n\t\t".join([trigger ['original_line'] for trigger in sorted_trigger_data]) + "\n\t}"
+
+# BETA TODO more trigger data
+def sort_triggers(indention: str, trigger_block: str, parent_event: str) -> str:
+	"""
+	Sorts Stellaris triggers based on an estimated priority list, preserving all content,
+	including comments and complex blocks. Also removes redundant triggers.
+	"""
+	logger.debug(f"Sorting triggers for parent '{parent_event}'")
+	priority_list = { 'is_scope_valid': -1, 'is_scope_type': 0 }
+	# TODO
+	planet_priority_list = {
+		'has_owner': 2,
+		'is_star': 2,
+		'is_capital': 3,
+		'is_homeworld': 3,
+		'is_occupied_flag': 5,
+		'is_colony': 6,
+		'has_ground_combat': 7,
+		'original_owner': 8,
+		'is_planet_class': 9,
+		'is_planet_flag': 10,
+		'is_colonizable': 11,
+		'is_under_colonization': 12,
+		'planet_size': 13,
+		'habitable_planet': 13,
+		'is_artificial': 14,
+		'has_anomaly': 14,
+		'has_deposit': 16,
+		'has_research_station': 19,
+		# Tier 1
+		'exists': 20,
+		'is_controlled_by': 22,
+		'owner': 23,
+		'last_building_changed': 24,
+		# Tier 3 Expensive
+		'has_deposit_for': 25,
+		'has_planet_modifier': 29,
+		'has_moon': 30,
+		'num_moons': 31,
+		'any_moon': 32,
+		'uninhabitable_regular_planet': 39,
+		'num_district': 40,
+		'num_buildings': 40,
+		# Bad
+
+	}
+	# system_priority_list = { 'is_capital': 3, 'is_occupied_flag': 5 }
+	# starbase_priority_list = { 'is_occupied_flag': 5 }
+	# leader_priority_list = { 'is_idle': 5 }
+	# pop_priority_list = {
+	# 	'has_planet': 2, 'is_sapient': 3, 'is_robotic': 4,
+	# 	'is_being_assimilated': 5, 'is_being_purged': 6, 'is_enslaved': 7,
+	# }
+
+	# TODO
+	# has_tradition
+	# has_ascension_perk
+	# num_ascension_perks
+	# empire_size
+	# empire_sprawl
+	# num_fleets
+	# num_ships
+	# income / expenses / balance / running_balance
+	# stored_physics_points / stored_society_points / stored_engineering_points
+	# has_faction
+	# has_envoy_task / num_envoys_to_federation
+
+	country_priority_list = {
+		# Most fundamental properties
+		'is_ai': 1,
+		'is_country_type': 2,
+		# Potentially expensive, but fundamental too
+		'last_increased_tech': 1,
+		'has_origin': 2,
+		'has_global_flag': 3,
+		'has_country_flag': 3,
+		# Core country properties
+		'has_built_species': 3,
+		'is_primitive': 4,
+		'has_authority': 4,
+		'is_gestalt': 5,
+		'is_regular_empire': 5,
+		'is_machine_empire': 5,
+		'is_hive_empire': 5,
+		'exists': 6,
+		# Civics and Ethics
+		'has_ethic': 6, 'has_civic': 6,
+		'last_changed_policy': 6,
+		# Type and simple flags
+		'has_policy_flag': 7,
+		'has_communications': 10,
+		'years_passed': 11,
+		'has_event_chain': 12,
+		'is_megacorp': 15,
+		'has_valid_civic': 15,
+		'is_galactic_community_member': 16, 'is_part_of_galactic_council': 17, 'is_galactic_emperor': 18,
+		'has_technology': 19,
+		'has_technology': 19,
+
+		# Expensive list iterations
+		'any_owned_planet': 20, 'any_system_planet': 20,
+		'any_owned_leader': 21, 'any_owned_ship': 22,
+		'any_relation': 23, 'any_federation_member': 23,
+
+	}
+
+	if parent_event == "country": priority_list.update(country_priority_list)
+	elif parent_event == "planet": priority_list.update(planet_priority_list)
+	# elif parent_event.startswith("pop_"): priority_list.update(pop_priority_list)
+	# elif parent_event.startswith("system"): priority_list.update(system_priority_list)
+	# elif parent_event.startswith("starbase"): priority_list.update(starbase_priority_list)
+	# elif parent_event.startswith("leader"): priority_list.update(leader_priority_list)
+
+	lines = trigger_block.split('\n')
+	sortable_triggers = []
+	other_lines = []
+	# comment_buffer = []
+	indention2 = indention.strip('\n') + "\t"
+
+
+	# This pattern identifies simple 'key = value' lines, excluding those that open blocks.
+	simple_trigger_pattern = re.compile(fr'^{indention2}(?:NOT = \{{)?(\w+) [<=>!]+ ([^\n]+[^{{])$') # \s*(#.*)?
+	can_trigger_sort = True # TODO needs to be less possible
+
+	for line in lines:
+		stripped_line = line.strip()
+		if not stripped_line: continue
+
+		# if stripped_line.startswith('#'):
+		# 	comment_buffer.append(line)
+		# 	continue
+		if can_trigger_sort:
+			match = simple_trigger_pattern.match(line)
+			if match:
+				key = match.group(1)
+				# Found a simple trigger. Associate the comment buffer with it.
+				sortable_triggers.append({
+					'key': key,
+					'value': match.group(2).strip(),
+					'line': line,
+					# 'comments': comment_buffer
+				})
+				# comment_buffer = []
+			else:
+				can_trigger_sort = False
+				other_lines.append(line)
+		else:
+			# Not a simple trigger. It's a complex line (e.g., OR = {) or closing brace.
+			# Any comments in the buffer belong to this complex line.
+			# if comment_buffer:
+			# 	other_lines.extend(comment_buffer)
+			# 	comment_buffer = []
+			can_trigger_sort = False
+			other_lines.append(line)
+
+	# if comment_buffer: # Append any trailing comments
+	# 	other_lines.extend(comment_buffer)
+	# DEBUG
+	# if len(other_lines) == 0:
+	# 	print(f"{parent_event} sort_triggers: trigger_block ={trigger_block}")
+	# else:
+	# 	print(f"{parent_event} sort_triggers: other_lines: {other_lines}, trigger_block ={trigger_block}")
+
+	# --- Redundancy Removal ---
+	trigger_dict = {t['key']: t['value'] for t in sortable_triggers}
+	keys_to_remove = set()
+	if parent_event.startswith("country"):
+		if trigger_dict.get('is_ai') == 'no' and trigger_dict.get('is_country_type') == 'default':
+			keys_to_remove.add('is_country_type')
+			logger.info("Redundancy: Removing 'is_country_type = default' because 'is_ai = no' is present.")
+		if trigger_dict.get('is_regular_empire') == 'yes' and trigger_dict.get('is_gestalt') == 'no':
+			keys_to_remove.add('is_gestalt')
+			logger.info("Redundancy: Removing 'is_gestalt = no' because 'is_regular_empire = yes' is present.")
+		if trigger_dict.get('is_gestalt') == 'yes' and trigger_dict.get('is_regular_empire') == 'no':
+			keys_to_remove.add('is_regular_empire')
+			logger.info("Redundancy: Removing 'is_regular_empire = no' because 'is_gestalt = yes' is present.")
+		if (trigger_dict.get('is_machine_empire') == 'yes' or trigger_dict.get('is_hive_empire') == 'yes') and trigger_dict.get('is_gestalt') == 'yes':
+			keys_to_remove.add('is_gestalt')
+			logger.info("Redundancy: Removing 'is_gestalt = yes' because a more specific gestalt type is present.")
+	elif parent_event.startswith("planet"):
+		if trigger_dict.get('is_controlled_by') == 'owner':
+			keys_to_remove.add('is_controlled_by')
+			if not trigger_dict.get('is_occupied_flag') == 'no':
+				trigger_dict.set('is_occupied_flag', 'no')
+			logger.info("Redundancy: Removing 'is_controlled_by = owner' because 'is_occupied_flag = no' is better.")
+			# r"\bis_controlled_by = owner\b": "is_occupied_flag = no", # TODO Just valid for planet but applies for: planet ship fleet starbase astral_rift
+
+
+	if keys_to_remove:
+		sortable_triggers = [t for t in sortable_triggers if t['key'] not in keys_to_remove]
+
+	# Sort the simple triggers
+	sorted_triggers = sorted(sortable_triggers, key=lambda trigger: (
+		priority_list.get(trigger['key'], 99),
 		trigger['key']
 	))
 
-	return trigger_suffix + "\n\t\t".join([trigger ['original_line'] for trigger in sorted_trigger_data]) + "\n\t}"
+	# Reconstruct the block: sorted simple triggers first, then others.
+	final_lines = []
+	for trigger in sorted_triggers:
+		# final_lines.extend(trigger['comments'])
+		final_lines.append(trigger['line'])
 
+	final_lines.extend(other_lines)
+
+	# Format and return
+	final_block = "\n"
+	final_block += "\n".join(final_lines)
+	final_block += f"{indention}}}"
+
+	return final_block
 
 def add_code_cosmetic():
 	global targetsR, targets3, targets4, exclude_paths
@@ -1767,7 +1956,7 @@ def add_code_cosmetic():
 		"Overlord": "overlord_dlc",
 		"Plantoids Species Pack": "plantoids",
 		"Plantoid": "plantoids",
-		# "Synthetic Dawn Story Pack": "synthetic_dawn", # enable it later - changed in v3.12
+		"Synthetic Dawn Story Pack": "synthetic_dawn", # enable it later - changed in v3.12
 		"Toxoids Species Pack": "toxoids",
 		"First Contact Story Pack": "first_contact_dlc",
 		"Galactic Paragons": "paragon_dlc",
@@ -1780,21 +1969,22 @@ def add_code_cosmetic():
 		"Grand Archive": "grand_archive_dlc",
 		"BioGenesis": "biogenesis_dlc",
 		"Stargazer Species Portrait": "stargazer_dlc",
-		"Shadows of the Shroud": "shroud_dlc",
 		# "": "mammalians_micro_dlc",
+		"Shadows of the Shroud": "shroud_dlc",
+		"Infernals Species Pack": "infernals ",
 	}
-
+	# COSMETIC START
 	targetsR.append([r"\bnum_\w+\s*[<=>]+\s*[a-z]+[\s}]", "no scope alone"])  #  [^\d{$@] too rare (could also be auto fixed)
-	targetsR.append([r"^\s+NO[RT] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[RT] = \{\s*[^{}#\n]+\s*\}", "can be merged into NOR if not in an OR"])  #  [^\d{$@] too rare (could also be auto fixed)
+	# targetsR.append([r"^\s+NO[RT] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[RT] = \{\s*[^{}#\n]+\s*\}", "can be merged into NOR if not in an OR"])  #  [^\d{$@] too rare (could also be auto fixed)
 
-	targets3[r"\b(or|not|nor|and)\s*="] = lambda p: p.group(1).upper() + " ="
 	targets3[r"\bexists = this\b"] = 'is_scope_valid = yes'
+	targets3[r"\bcapital_scope.star\b"] = 'capital_star'
 
 	# targets3[r"\s*days = -1\s*"] = ' ' # still needed to execute immediately
 	if full_code_cosmetic:
-		targets3[r"(?:^|[<=>{]\s|\.|\t|PREV|FROM|Prev|From)+(PREV|FROM|ROOT|THIS|Prev|From|Root|This)+\b" ] = lambda p: p.group(0).lower()
-		targets3[r"\b(IF|ELSE|ELSE_IF|Owner|CONTROLLER|Controller|LIMIT)\s*="] = lambda p: p.group(1).lower() + " =" # OWNER
-		targets3[r"\blimit = \{\s*\}"] = "# limit = { }"
+		# targets3[r"\s*(#\s*)?limit = \{\s*\}"] = ""
+		targets3[r"\badd = 0(\s|$)"] = r"factor = 0\1"
+		targets3[r"\bpop_amount <= 0(\s|$)"] = r"pop_amount < 1\1"
 		targets3[r'\bhost_has_dlc = "([\s\w]+)"'] = (
 			re.compile(r"^(?!common/(?:traits|scripted_triggers))"),
 			lambda p: (
@@ -1803,62 +1993,42 @@ def add_code_cosmetic():
 				else p.group(0)
 			)
 		)
-		# Now in def format_indentation
-		# targets3[r" {4}"] = r"\t" # convert spaces to tabs
-		# targets4[r"^\t*?\n(\t+\})$"] = r"\1" # cosmetic remove surplus lines
-		# targets4[r"(\t*?\n){3,6}"] = "\n\n" # cosmetic remove surplus lines
-		# Format Comment
-		# targets3[r"(?<!(?:e\.g|.\.\.))([#.])\t{1,3}([a-z])([a-z]+ +[^;:\s#=<>]+)"] = lambda p:	(p.group(1) + " " + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0)
-		# targets3[r"#([^\-\s#])"] = r"# \g<0>"
-		# targets3[r"# +([A-Z][^\n=<>{}\[\]# ]+? [\w,\.;\'\//+\- ()&]+? \w+ \w+ \w+)$"] = r"# \1." # set comment punctuation mark
-		# targets3[r"# *([A-Z][\w ={}]+?)\.$"] = r"# \g<0>" # remove comment punctuation mark
-		targets3[r"(?<!(?:e\.g|.\.\.))([#.]\t)([a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: (p.group(1) + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0)
-		targets3[r"\bNOT = \{\s*any(_\w+ = {)([^{}#]+?)\}\s*\}"] = r"count\1 count = 0 limit = {\2} }"
-		targets3[r"\bany(_\w+ = {)\s*\}"] = r"count\1 count > 0 }"
+		# targets3[r"(?<!(?:e\.g|.\.\.))([#.]\t)([a-z])([a-z]+ +[^;:\s#=<>]+ [^\n]+?[\.!?])$" ] = lambda p: (p.group(1) + p.group(2).upper() + p.group(3)) if not re.match(r"(%s)" % SCOPES, p.group(2) + p.group(3)) else p.group(0) PORTED
+		# targets3[r"\bNO[RT] = \{\s*((?:%s) = \{)\s*([^\s]+) = yes\s*\}\s*\}" % triggerScopes] = r"\1 \2 = no }" PORTED
+		# targets3[r"\bNO[RT] = \{\s*any(_\w+ = \{)([^{}#]+?)\}\s*\}"] = r"count\1 count = 0 limit = {\2} }" PORTED
+		# targets3[r"\bany(_\w+ = {)\s*\}"] = r"count\1 count > 0 }"
+		# targets3[r"\bcount(_\w+ = {) count > 0\s*\}"] = r"any\1}" PORTED
 		targets3[r"\bowner_main_species\b"] = "owner_species"
-		targets3[r"\bhas_country_resource = \{\s+type = (\w+)\s+amount\s*([<=>]+\s*\d+)\s+\}"] = r"resource_stockpile_compare = { resource = \1 value \2 }" # The newer syntax
+		targets3[r"\bis_mechanical_species\b"] = (("T", "is_mechanical_species"), "is_robotic_species")
+		# targets3[r"\bis_country\b"] = "is_same_empire",
+		# targets3[r"\bis_same_value = ([\w\.:]+(?:controller|(?:space_)?owner)(?:\.overlord)?(?:[\s}]+|$))"] = r"is_same_empire = \1"
+		# targets3[r"((?:controller|owner|overlord|country|federation_ally|(?:%s)_(?:attacker|defender)) = \{|(?:is_ai|has_federation|is_federation_leader|is_at_war|overlord|subject) = (?:yes|no)|has_country_flag = \w+)\s+is_same_value\b" % VANILLA_PREFIXES] = r"\1 is_same_empire" # not valid for armies
+		# targets4[r"\b(?:controller|owner|overlord|country|federation_ally) = \{[^{}#]*?(?:limit = \{\s*)?(?:NO[RT] = \{)?\s*is_same_value\b"] = ["is_same_value", "is_same_empire"]
+		# TODO CHECK IF VALID ACCUSATION
+		# targets3[r"\bhas_country_resource = \{\s+type = (\w+)\s+amount\s*([<=>]+\s*\d+)\s+\}"] = r"resource_stockpile_compare = { resource = \1 value \2 }" # The newer syntax
 		# targets3[r"\bresource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}"] = r"has_country_resource = { type = \1 amount \2 }"
 		# targets4[r"\bresource_stockpile_compare = \{\s+resource = \w+\s+value\s*[<=>]+\s*\d+\s+\}"] = [
 		# 	r"resource_stockpile_compare = \{\s+resource = (\w+)\s+value\s*([<=>]+\s*\d+)\s+\}", r"has_country_resource = { type = \1 amount \2 }"]
-		targets4[r"\bcount_\w+ = \{\s+limit = \{[^#]+?\}\s+count\s*[<=>]+\s*[^{}\s]+"] = [
-			r"(count_\w+ = \{)(\s+)(limit = \{[^#]+?\})\2(count\s*[<=>]+\s*[^{}\s]+)", r"\1\2\4\2\3"] # Put count first
-		# TODO: not pre_triggers and option parameters
-		# NOR <=> (<AND>) = { NOT/no
-		targets4[r"(?<!\tOR) = \{(\s(?:[^{}#\n]+\n)*(?:\s+NO[RT] = \{\s*[^{}#]+?\s*\}|\s+\w+ = no){3})\s+\}"] = [ # (extended version NOT/no, simple NOT version is in basic)
-			r"(\n\s*?)(?:NO[RT] = \{\s*([^{}#]+?)\s*\}|(\w+ = no))\1(?:NO[RT] = \{\s*([^{}#]+?)\s*\}|(\w+ = no))", (re.compile(r"^(?!common/governments)\w"),
-			# \1NOR = {\1\t\2\3\1\t\4\5\1}
-			lambda p: f"{p.group(1)}NOR = {{{p.group(1)}\t" +
-			(re.sub("= no$","= yes", p.group(2), count=1)
-			if p.group(2)
-			else re.sub("= no$","= yes", p.group(3), count=1))
-			+ f"{p.group(1)}\t" +
-			(re.sub("= no$","= yes", p.group(4), count=1)
-			if p.group(4)
-			else re.sub("= no$","= yes", p.group(5), count=1))
-			+ f"{p.group(1)}}}"
-		)]  # only 3 items (sub-trigger)
-		# Temp back fix
-		targets4[r"(?s)((\n\t+)(?:settings|pre_triggers|behaviour) = \{.+?)\2\}"] = [
-			r"((\n\t+)(?:settings|pre_triggers|behaviour) = \{[^{}]*)\2\tNO[RT] = \{\2\s+([^{}]+)\2\t\}([\s\S]*)$",
-			lambda m: (
-				m.group(1) + m.group(2) + '\t' +
-				re.sub(r" = yes\b", " = no", dedent_block(m.group(3))) +
-				m.group(4)
-			)
-		] # r"\1 = {\2\3no\2\4no",
+		targets4[r"ordered_controlled(_fleet = \{(\n\s+)limit = \{(\2\t\w+ = \w+){0,4}\s+is_leased = no)"] = r"ordered_owned\1"
+		targets4[r"(\s|\.)species( = \{\s*(is_organic_species = (?:yes|no))\s*\})"] = lambda m: m.group(2) if m.group(1) == "." else (m.group(1) + m.group(3))
+		# targets4[r"\bcount_\w+ = \{\s+limit = \{[^#]+?\}\s+count\s*[<=>]+\s*[^{}\s]+"] = [ PORTED
+		# 	r"(count_\w+ = \{)(\s+)(limit = \{[^#]+?\})\2(count\s*[<=>]+\s*[^{}\s]+)", r"\1\2\4\2\3"] # Put count first
+
+		targets4[r"(\n\t+)spawn_system = \{[^{}]+?\1\}"] = lambda m: re.sub(r'(min|max)_distance [<>]=? ', r'\1_distance = ', m.group(0))
 
 		logger.info("✨ Running full code cosmetic!\n")
 	else:
 		logger.info("✨ Running some code cosmetic.\n")
 
 	# NOT NUM triggers (TODO make this a function)
-	targets3[r"\bNOT = \{\s*(\w+)\s*([<=>]+)\s*(@\w+|-?[\d.]+)\s+\}"] = lambda p: p.group(1) +" "+ ({
-				">": "<=",
-				"<": ">=",
-				">=": "<",
-				"<=": ">",
-				"=": "!=",
-			}[p.group(2)]  ) +" "+ p.group(3) if p.group(2) != "=" or p.group(3)[0] == "@" or p.group(3)[0] == "-" or is_float(p.group(3)) else p.group(0)
+	# TODO TEST if this last regexp successfully implemented in logic_optimizer
+	# targets3[r"\bNOT = \{\s*(\w+)\s*([<=>]+)\s*(@\w+|-?[\d.]+)\s+\}"] = lambda p: p.group(1) +" "+ ({
+	# 			">": "<=",
+	# 			"<": ">=",
+	# 			">=": "<",
+	# 			"<=": ">",
+	# 			"=": "!=",
+	# 		}[p.group(2)]  ) +" "+ p.group(3) if p.group(2) != "=" or p.group(3)[0] == "@" or p.group(3)[0] == "-" or is_float(p.group(3)) else p.group(0)
 	# targets3[r"(\w+)\s*!=\s*([^\n\s<\=>{}#]+)"] = r"NOT = { \1 = \2 }"
 	targets3[r"\bNOT = \{\s*(num_\w+|\w+?(?:_passed)) = (\d+)\s*\}"] = r"\1 != \2"
 	targets3[r"(^|\s|\.)fleet = \{\s*(destroy|delete)_fleet = this\s*\}"] = lambda p: (
@@ -1866,8 +2036,6 @@ def add_code_cosmetic():
 		else f"{p.group(1)}{p.group(2)}_fleet = fleet")
 	targets3[r"\bchange_all = no"] = ""  # only yes option
 	targets3[r"\b(has_(?:population|migration)_control) = (yes|no)"] = r"\1 = { type = \2 country = prev.owner }"  # NOT SURE
-	# targets3[r"\bNOT = \{\s*has_valid_civic\b"] = "NOT = { has_civic"
-	targets3[re.compile(r"\bNO[RT] = \{\s*((?:%s) = \{)\s*([^\s]+) = yes\s*\}\s*\}" % triggerScopes, re.I )] = r"\1 \2 = no }"
 	targets3[r"(^|\s|\.)(?:space_)?owner = \{ (?:is_country_type = default|merg_is_default_empire = (yes|no)) \}"] = (NO_TRIGGER_FOLDER, lambda p: (
 		(" = { can_generate_trade_value = " + p.group(2) + " }"
 		if p.group(1) == "."
@@ -1894,22 +2062,13 @@ def add_code_cosmetic():
 			r"(species|country|ship|pop|leader|army) = \{\s*is_same_value = ([\w\.:]+?\.?species)\s*\}",
 			r"\1 = { is_same_species = \2 }"
 		],
-		# targets4[r"\n\s+\}\n\s+else": [r"\}\s*else", "} else"],
 		r"\bany_system_planet = {\s+is_capital = yes\s+}": "is_capital_system = yes",
-		r"\s+any_system = \{\s*any_system_planet = \{\s*(?:\w+ = \{[\w\W]+?\}|[\w\W]+?)\s*\}\s*\}": [
-			r"(\n?\s+)any_system = \{(\1\s*)any_system_planet = \{\1\s*([\w\W]+?)\s*\}\s*\1\}",
-			r"\1any_galaxy_planet = {\2\3\1}",
-		],
+		r"(\n\t+)any_system = \{\1\tany_system_planet( = \{\n[\s\S]+?)\1\t\}\1\}": r"\1any_galaxy_planet\2\1}",
 
 		# Only for planet galactic_object
-		r"(?:(?:neighbor|rim|closest|%s)_system|_planet|_system_colony|_within_border) = \{\s*?(?:limit = \{)?\s*exists = (?:space_)?owner\b" % VANILLA_PREFIXES: [
+		r"(?:(?:neighbor|rim|closest|%s)_system|planet|system_colony)(?:_within_border)? = \{\s*?(?:limit = \{)?\s*(?:has_owner = yes\s+)?exists = (?:space_)?owner\b" % VANILLA_PREFIXES: [
 			r"exists = (?:space_)?owner", "has_owner = yes"],  # only for planet galactic_object,
 		r"_event = \{\s+id = \"[\w.]+\"": [r"\bid = \"([\w.]+)\"", ("events", r"id = \1")],  # trim id quote marks
-		# WARNING not valid if in OR: NOR <=> AND = { NOT NOT } , # only 2 items (sub-trigger),
-		r"^\s+NO[RT] = \{\s*[^{}#\n]+\s*\}\s*?\n\s*NO[RT] = \{\s*[^{}#\n]+\s*\}": [
-			r"(\t+)NO[RT] = \{\s*([^{}#\n]+)\s*\}\s*?\n\s*NO[RT] = \{\s*([^{}#\n]+)\s*\}",
-			(r"^(?!governments)\w+", r"\1NOR = {\n\1\t\2\n\1\t\3\n\1}"),
-		],
 		r"^\s+random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}": [r"random_country = \{\s*limit = \{\s*is_country_type = global_event\s*\}", "event_target:global_event_country = {"],
 		# UNNECESSARY SCOPING (rare, up to 6 items)
 		r"^((\t+)exists = (%s)(?:\n\2\3 = \{\s+[\w:@.]+ = (?:[^{}#]+?|[^\n]+?)\s+\}){2,6})\n" % SCOPES: [
@@ -1921,37 +2080,22 @@ def add_code_cosmetic():
 				f"\n{m.group(2)}}}"
 			)
 		],
-		# UNNECESSARY AND (up to 19 items)
-		r"\b((?:%s) = \{(\s+)(?:AND|this) = \{(?:\2\t[^\n]+){1,19}\2\}\n)" % triggerScopes: [
-			r"(%s) = \{\n(\s+)(?:AND|this) = \{\n\t(\2[^\n]+\n)(?(3)\t)(\2[^\n]+\n)?(?(4)\t)(\2[^\n]+\n)?(?(5)\t)(\2[^\n]+\n)?(?(6)\t)(\2[^\n]+\n)?(?(7)\t)(\2[^\n]+\n)?(?(8)\t)(\2[^\n]+\n)?(?(9)\t)(\2[^\n]+\n)?(?(10)\t)(\2[^\n]+\n)?(?(11)\t)(\2[^\n]+\n)?(?(12)\t)(\2[^\n]+\n)?(?(13)\t)(\2[^\n]+\n)?(?(14)\t)(\2[^\n]+\n)?(?(15)\t)(\2[^\n]+\n)?(?(16)\t)(\2[^\n]+\n)?(?(17)\t)(\2[^\n]+\n)?(?(18)\t)(\2[^\n]+\n)?(?(19)\t)(\2[^\n]+\n)?(?(20)\t)(\2[^\n]+\n)?\2\}\n"
-			% triggerScopes,
-			r"\1 = {\n\3\4\5\6\7\8\9\10\11\12\13\14\15\16\17\18\19\20\21",
-		],
-		# UNNECESSARY OR - TODO don't use dangerous dot search
-		r"(?s)((\n\t+)OR = \{(\2\t)OR = \{\3\t.+?\3\}\3.+?)\2\}": [
-			r"^(\s+OR = \{)(\s+)OR = \{\2\t([\s\S]+?)\2\}\2([^#\n]+?|\w+ = \{[[\s\S]+?\})$",
-			lambda p: f"{p.group(1)}{p.group(2)}{dedent_block(p.group(3))}{p.group(2)}{p.group(4)}"
-		],
 		# MERGE UNNECESSARY SAME ITEM in SAME SCOPE in OR (very rare, because dumb)
-		r"^((\t+)OR = \{\n(\s+)((?:%s) = \{)\s+[^{}]+?\n\3\}\n\3\4[^{}]+?\n\3\})\n?\2\}" % SCOPES: [
-			r"^(\s+)OR = \{(\s+)(\w+ = \{)\s+([^{}#\n\t]+)\s+([^{}#\n\t]+?)\2\}\2\3\s+((?:\4|\5)\s+[^{}#\n\t]+?|[^{}#\n\t]+?\s+(?:\4|\5))\2\}$",
-			lambda p: p.group(1) + (
-				f"{p.group(3)}{p.group(2)}{p.group(4)}{p.group(2)}OR = {{{p.group(2)}\t{p.group(5)}{p.group(2)}\t"+
-				re.sub(p.group(4),'', p.group(6)).strip()
-				if p.group(4) in p.group(6)
-				else
-					f"{p.group(3)}{p.group(2)}{p.group(5)}{p.group(2)}OR = {{{p.group(2)}\t{p.group(4)}{p.group(2)}\t"+
-					re.sub(p.group(5),'', p.group(6)).strip()
-			) + p.group(2) + "}"
-		], # \1\3\2\5\2OR = {\2\t\4\2\t\6\2}
+		# TODO TEST if this last regexp successfully implemented in logic_optimizer
+		# r"^((\t+)OR = \{\n(\s+)((?:%s) = \{)\s+[^{}]+?\n\3\}\n\3\4[^{}]+?\n\3\})\n?\2\}" % SCOPES: [
+		# 	r"^(\s+)OR = \{(\s+)(\w+ = \{)\s+([^{}#\n\t]+)\s+([^{}#\n\t]+?)\2\}\2\3\s+((?:\4|\5)\s+[^{}#\n\t]+?|[^{}#\n\t]+?\s+(?:\4|\5))\2\}$",
+		# 	lambda p: p.group(1) + (
+		# 		f"{p.group(3)}{p.group(2)}{p.group(4)}{p.group(2)}OR = {{{p.group(2)}\t{p.group(5)}{p.group(2)}\t"+
+		# 		re.sub(p.group(4),'', p.group(6)).strip()
+		# 		if p.group(4) in p.group(6)
+		# 		else
+		# 			f"{p.group(3)}{p.group(2)}{p.group(5)}{p.group(2)}OR = {{{p.group(2)}\t{p.group(4)}{p.group(2)}\t"+
+		# 			re.sub(p.group(5),'', p.group(6)).strip()
+		# 	) + p.group(2) + "}"
+		# ], # \1\3\2\5\2OR = {\2\t\4\2\t\6\2}
 		# MERGE UNNECESSARY SCOPING (simplify 3 pairs) simple version is basic.
 		r"^((\t+)(?:%s|N?AND|N?OR) = \{(\s+(?:%s)) = \{\s+[^#\n]+?\s*\}\3 = \{\s+[^#\n]+?\s*\}\3 = \{\s+[^#\n]+?\s*\})\n?\2\}" % (SCOPES, SCOPES): [
 			r"(\w+ = \{)(\s+)(%s) = \{\s+([^#\n]+?)\s*\}\s+\3 = \{\s+([^#\n]+?)\s+\}\s+\3 = \{\s+([^#\n]+?)\s+\}" % SCOPES, r"\3 = {\2\1\2\t\4\2\t\5\2\t\6\2}",
-		],
-		# NAND => MERGE OR = no/NOT, NAND (TODO: we can also include compare operater)
-		r"(?s)((\n\t*)OR = \{\2\t\w+ = \{\s*(?:\w+ = no|NOT = \{\s+[^\n{}#]+\s+\})\s*\}\2\tNAND = \{.*?\2\t\})\2\}": [
-			r"OR = \{(\n\t+)(\w+) = \{\s*(\w+) = no\s*\}\1NAND = \{([\s\S]*?)\1\}$",
-			lambda m: f'NAND = {{{m.group(1)}{m.group(2)} = {{ {m.group(3)} = yes }}{dedent_block(m.group(4))}'
 		],
 		r"(?:\n\t+add_resource = \{\s*\w+ = [^\s{}#]+\s*\}){2,7}": [
 			r"(\s+)add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\}\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\}(?(3)\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\})?(?(4)\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\})?(?(5)\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\})?(?(6)\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\})?(?(7)\s+add_resource = \{\s*(\w+ = [^\s{}#]+)\s*\})?",
@@ -1970,13 +2114,11 @@ def add_code_cosmetic():
 		# 	r"is_gestalt = \1\2",
 		# ],
 		r"\b(?:is_gestalt = (?:yes|no)\s+is_hive_empire = (?:yes|no)|is_hive_empire = (?:yes|no)\s+is_gestalt = (?:yes|no))": [
-			r"(?:is_gestalt = (yes|no)\s+is_hive_empire = \1|is_hive_empire = (yes|no)\s+is_gestalt = \2)", (("T", "is_gestalt"), r"is_gestalt = \1\2"),
+			r"(?:is_gestalt = (yes|no)\s+is_hive_empire = \1|is_hive_empire = (yes|no)\s+is_gestalt = \2)", r"is_hive_empire = \1\2",
 		],
 		r"\b(?:is_fallen_empire = yes\s+is_machine_empire|is_machine_empire = yes\s+is_fallen_empire|is_fallen_machine_empire) = yes": (("T", "is_fallen_empire_machine"), "is_fallen_empire_machine = yes"),
-		r"\b(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(?:%s)|has_ethic = ethic_fanatic_(?:%s)\s+is_fallen_empire = yes)" % (VANILLA_ETHICS, VANILLA_ETHICS): [
-			r"(?:is_fallen_empire = yes\s+has_ethic = ethic_fanatic_(%s)|has_ethic = ethic_fanatic_(%s)\s+is_fallen_empire = yes)" % (VANILLA_ETHICS, VANILLA_ETHICS),
+		r"\b(?:is_fallen_empire = yes\s+has_ethic = (\"?)ethic_fanatic_(%s)(\"?)|has_ethic = (\"?)ethic_fanatic_(%s)(\"?)\s+is_fallen_empire = yes)" % (VANILLA_ETHICS, VANILLA_ETHICS):
 			(NO_TRIGGER_FOLDER, r"is_fallen_empire_\1\2 = yes"),
-		],
 		r'\b(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (?:yes|no)|has_machine_age_dlc = (?:yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")': [
 			r'(?:host_has_dlc = "Synthetic Dawn Story Pack"\s*has_machine_age_dlc = (yes|no)|has_machine_age_dlc = (yes|no)\s*host_has_dlc = "Synthetic Dawn Story Pack")', (NO_TRIGGER_FOLDER,
 			lambda p: "has_synthetic_dawn_"
@@ -1992,11 +2134,13 @@ def add_code_cosmetic():
 		r"\bexists = owner\s+can_generate_trade_value = yes": (("T", "can_generate_trade_value"), "can_generate_trade_value = yes"),
 		r"\bfederation = \{\s+any_member = \{\s+[^{}#]+\s+\}": [
 			r"\bfederation = \{\s+any_member = \{\s+([^{}#]+)\s+\}", r"any_federation_ally = { \1"],
-		r"\b(?:NO[RT] = \{(?:(?:\s+has_trait = trait_(?:hive_mind|mechanical|machine_unit)){3}|(?:\s+has_trait = trait_hive_mind|is_robotic(?:_species)? = yes){2})\s+\})": (("T", "is_valid_pop_for_PLANET_KILLER_NANOBOTS"), "is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes"),
+		r"\b(?:NO[RT] = \{(?:(?:\s+has_trait = trait_(?:hive_mind|mechanical|machine_unit)){3}|(?:\s+(has_trait = trait_hive_mind|is_robotic(?:_species)? = yes)){2})\s+\})": (("T", "is_valid_pop_for_PLANET_KILLER_NANOBOTS"), "is_valid_pop_for_PLANET_KILLER_NANOBOTS = yes"),
 		r"\b(?:has_country_flag = synthetic_empire\s+owner_species = \{ has_trait = trait_mechanical \}|owner_species = \{ has_trait = trait_mechanical \}\s+has_country_flag = synthetic_empire)\b": (("T", "is_mechanical_empire"), "is_mechanical_empire = yes"),
-		r"\b(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|has_authority = \"?auth_machine_intelligence\"?)\s+(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|has_authority = \"?auth_machine_intelligence\"?)\s+(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|has_authority = \"?auth_machine_intelligence\"?)\b": (("T", "is_robot_empire"), "is_robot_empire = yes"),
+		r"(?:(\s+)is_(?:(?:machine|synthetic|mechanical|robot)_empire|robotic_species) = yes){3,4}": (("T", "is_robot_empire"), r"\1is_robot_empire = yes"),
+		r"\b(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|is_machine_empire = yes)\s+(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|is_machine_empire = yes)\s+(?:has_country_flag = synthetic_empire|owner_species = \{ has_trait = trait_mechanical \}|is_machine_empire = yes)\b": (("T", "is_robot_empire"), "is_robot_empire = yes"),
 		r"^\ttrigger = \{\n\t\towner\b": ("events", r"\ttrigger = {\n\t\texists = owner\n\t\towner"),
 		r"^((\t+)(potential|trigger) = \{(\n\t\2(?!exists = owner)\w+ = (?:yes|no))?\n\t\2(owner|has_living_standard)\b)": (["common/pop_categories", "common/inline_scripts/pop_categories"], r"\2\3 = {\4\n\t\2exists = owner\n\t\2\5"),
+		# r"^((\t(?:triggered_planet_modifier = \{\n?\t+(\t+))?(?:potential|destroy_trigger) = \{)(?:(\n\t+(?!has_owner)\w+ = (?:yes|no))|\n\t+exists = owner)?\n\t+(owner)\b)": ("common/buildings", r"\2\4\n\t\t\3has_owner = yes\n\t\t\3\5"), now in function
 		## Bit more than cosmetic (but performance intense general grab)
 		## Just move on the first place if present (but a lot of blind matches)
 		r"(?s)((\n\t+)any_system_(?:colony|planet) = \{\2\t(?!(?:has_owner = yes|is_colony = yes|exists = owner)).+?\2\})": [
@@ -2028,16 +2172,35 @@ def add_code_cosmetic():
 		r"(?s)^\ttriggered_\w+?_modifier = \{\n(.+?)\n\t\}$": [
 			r"\t\tmodifier = \{\s+([^{}]*?)\s*\}", (re.compile(r'^(?!events)'), lambda p: dedent_block(f'\t\t\t{p.group(1)}'))
 		],
+		# TODO performance: a lot of blind matches mean_time_to_happen = { months = 5000 }
+		r'^\tmean_time_to_happen = \{\s+((?:days|months) = \d\d+)\b': [
+			r"(days|months) = (\d\d+)\b", ("events",
+			lambda p: (
+				f"years = {int(p.group(2)) // 360}"
+				if int(p.group(2)) > 320 and int(p.group(2)) % 360 < 41
+				else (
+					f"months = {int(p.group(2)) // 30}"
+					if int(p.group(2)) > 28 and int(p.group(2)) % 30 < 3
+					else f"days = {p.group(2)}"
+				)
+				if p.group(1) == "days"
+				else (
+					f"years = {int(p.group(2)) // 12}"
+					if int(p.group(2)) > 11 and int(p.group(2)) % 12 < 2
+					else f"months = {p.group(2)}"
+				)
+			))
+		],
 		# TODO performance: a lot of blind matches
-		r'\b(?:add_modifier = \{\s*modifier|set_timed_\w+ = \{\s*flag) = "?[\w@.]+"?\s+days = \d{2,}\s*?(?:\#[^\n{}]+\n\s+)?\}': [
+		r'\b(?:add_modifier = \{\s*modifier|set_timed_\w+ = \{\s*flag) = "?[\w@.]+"?\s+(days = \d{2,})\s*?(?:\#[^\n{}]+\n\s+)?\}': [
 			r"days = (\d{2,})\b",
 			lambda p: (
-				"years = " + str(int(p.group(1)) // 360)
+				f"years = {int(p.group(1)) // 360}"
 				if int(p.group(1)) > 320 and int(p.group(1)) % 360 < 41
 				else (
-					"months = " + str(int(p.group(1)) // 30)
+					f"months = {int(p.group(1)) // 30}"
 					if int(p.group(1)) > 28 and int(p.group(1)) % 30 < 3
-					else "days = " + p.group(1)
+					else f"days = {p.group(1)}"
 				)
 			)
 		],
@@ -2049,20 +2212,21 @@ def add_code_cosmetic():
 				else p.group(0)
 			)
 		],
-		# ^((\s+)NOT = \{\s+any_\w+ = [\s\S]+?)^\2\} not one liner
-		# FIXME  exclude any_available_random_trait_by_tag_evopred
-		r"((\n\t+)NOT = \{( |\2)\t?any_\w+ = \{(?:( )[^\n]+?|(?:\2\t[^\n]+?){1,6})(?(4)\4|\s+)\}\3\})$": [
-			r"(\s+)NOT = \{(\1\s|\s)any(_\w+ = \{)([\s\S]+?\})$", ( "biogenesis_effects.txt" ,
-			lambda p: (
-				f"{p.group(1)}count{p.group(3)} count = 0{p.group(2)}limit = {{{p.group(4)}"
-				if not re.search(r'^'+p.group(1)+r'\t\w+ = \{', p.group(4), re.M)
-				else p.group(0)
-			))
-		],
+		# PORTED ^((\s+)NOT = \{\s+any_\w+ = [\s\S]+?)^\2\} not one liner
+		# r"((\n\t+)NOT = \{( |\2)\t?any_\w+ = \{(?:( )[^\n]+?|(?:\2\t\t[^\n]+?){1,6})(?(4)\4|\s+)\}\3\})$": [
+		# 	r"(\n\t+)NOT = \{(\1\t| )any(_\w+ = \{)([\s\S]+?\2\}\1\})$", (
+		# 		"biogenesis_effects.txt" , # FIXME  exclude any_available_random_trait_by_tag_evopred
+		# 		lambda p: (
+		# 			f"{p.group(1)}count{p.group(3)} count = 0{p.group(2)}limit = {{{p.group(4)}"
+		# 			if not re.search(r'^'+p.group(1)+r'\t\w+ = \{', p.group(4), re.M)
+		# 			else p.group(0)
+		# 		)
+		# 	)
+		# ],
 		# Effect block must be last
 		# FIXME a lot of blind matches
 		r"(?s)((\n\t+)create_(?:%s) = \{\2\t[^{}]+?\2\teffect = \{\2\t\t.*?)\2\}" % LAST_CREATED_SCOPES: [
-			r"(?s)((\n\t+)create_\w+ = \{\2\t[^{}]+?)(\2\teffect = \{\2\t\t.*?\2\t\})(.*?)$", # (?:\2\t[^\n]+){1,6}
+			r"(?s)((\n\t+)create_\w+ = \{\2\t[^{}]+?)(\2\teffect = \{\2\t\t.*?\2\t\})(.*)$", # (?:\2\t[^\n]+){1,6}
 			r"\1\4\3"
 		],
 		## Merge last_created_xxx
@@ -2072,6 +2236,11 @@ def add_code_cosmetic():
 				f"{p.group(1)}{p.group(2)}\teffect = {{{(p.group(3) if p.group(3) else '')}"
 				f"{p.group(2)}\t\t{indent_block(p.group(4))}{p.group(2)}\t\t}}{p.group(2)}\t}}"
 		], # \1\2\teffect = {\3\2\t\4\2}
+		# Revert fleet
+		r"(?s)((\n\t+)create_fleet = \{\2\t[^{}]+?\2\tsettings = \{\2\t\t.*?\2\t\}\2\teffect = \{\2\t\t.*?)\2\}": [
+			r"(?s)((\n\t+)create_fleet = \{\2\t[^{}]+?)(\2\tsettings = \{\2\t\t.*?\2\t\})(.*)$", # (?:\2\t[^\n]+){1,6}
+			r"\1\4\3"
+		],
 		r"((\n\t+)create_pop_group = \{(?:\2\t[^{}]*?|(?:\2\t[^\n]+){1,18})\2\}\2(?:last_created_pop|event_target:last_created_pop_group) = \{( |\2)[\s\S]+?)(?(3)\3)\}": [
 			r"((\n\t+)create_\w+ = \{(?:\2\t[^{}]+?|(?:\2\t(?!effect = \{)[^\t\n]+){1,18}))(?:\2\teffect = \{(\2\t\t[\s\S]*?)\2\t\})?\2\}\s+(?:[\w+:]+) = \{\s+([\s\S]+?)\s+\}$", lambda p:
 				f"{p.group(1)}{p.group(2)}\teffect = {{" + (
@@ -2086,11 +2255,54 @@ def add_code_cosmetic():
 				f"{p.group(1)}{p.group(2)}\teffect = {{{(p.group(3) if p.group(3) else '')}"
 				f"{p.group(2)}\t\t{indent_block(p.group(4))}{p.group(2)}\t}}{p.group(2)}}}"
 		], # \1\n\2\teffect = {\3\n\2\t\4\n\2}
-		r"^\t((?:possible_|can_join_)?pre_triggers) = \{\n([^{}]+)\n\t\}": (["events", "pop_jobs", "pop_faction_types", "inline_scripts"], sort_pre_triggers),
+		## SORT TRIGGERS after priority
+		# BETA TODO more trigger data
+		# r"^(country_event = \{(?:\n+\t(?!trigger)[^\n\t]+){2,7}\n+\ttrigger = \{)((?:\n\t\t\w(?:[^{}]+|[^\n]+)){2,10})\n\t\}": ("events",
+		# 	lambda m: m.group(1) + sort_triggers('\n\t', m.group(2), "country")
+		# ),
+		# r"^(cb_\w+ = \{(?:\n+\t(?!potential|is_valid)[^\n\t]+){2,7}\n+\t(?:potential|is_valid) = \{)((?:\n\t\t\w(?:[^{}]+|[^\n]+)){2,10})\n\t\}": ("common/casus_belli",
+		# 	lambda m: m.group(1) + sort_triggers('\n\t', m.group(2), "country")
+		# ),
+		# r"((\n\t+)(?:%s)_(?:country|galcom_member|relation) = \{[^{}#]*?(\2\t)limit = \{)((?:\3\t\w(?:[^{}]+|[^\n]+)){2,10})\3\}" % VANILLA_PREFIXES:
+		# 	lambda m: m.group(1) + sort_triggers(m.group(3), m.group(4), "country")
+		# ,
+		# r"((\n\t+)any_(?:country|galcom_member|relation) = \{[^{}#]*?)((?:\2\t\w(?:[^{}]+|[^\n]+)){2,10})\2\}":
+		# 	lambda m: m.group(1) + sort_triggers(m.group(2), m.group(3), "country")
+		# ,
+		# # Planets
+		# r"((\n\t+)(?:%s)_(?:planet|system_planet|planet_within_border|system_colony) = \{[^{}#]*?(\2\t)limit = \{)((?:\3\t\w(?:[^{}]+|[^\n]+)){2,10})\3\}" % VANILLA_PREFIXES:
+		# 	lambda m: m.group(1) + sort_triggers(m.group(3), m.group(4), "planet")
+		# ,
+		# r"((\n\t+)any_(?:planet|system_planet|planet_within_border|system_colony) = \{[^{}#]*?)((?:\2\t\w(?:[^{}]+|[^\n]+)){2,10})\2\}":
+		# 	lambda m: m.group(1) + sort_triggers(m.group(2), m.group(3), "planet")
+		# ,
+		r"^((pop_group|planet|system|starbase|leader)_event = \{(?:\n+\t(?!pre_triggers)[^\n\t]+){2,7}\n+)\t(pre_triggers) = \{\n([^{}]+)\n\t\}": ("events",
+			lambda m: m.group(1) + sort_pre_triggers(m.group(3), m.group(4), m.group(2))
+		),
+		r"^\t((?:possible_|can_join_)?pre_triggers) = \{\n([^{}]+)\n\t\}": (["common/pop_jobs", "common/pop_faction_types", "common/inline_scripts"],
+			lambda m: sort_pre_triggers(m.group(1), m.group(2), "pop_group")
+		),
+		# (\t+)OR = \{ \s+\} # has_deposit = no should be cheaper?
+		r"^(\s+has_deposit_for = \S+)\n(\t+(?:has_deposit|has_\w+_station) = (?:yes|no))$": (["events", "common/anomalies", "common/scripted_effects", "common/inline_scripts", "common/patrons/psionic_auras"], r"\2\n\1"), # r"\1OR = {\3\2\n\1}"
+		# Replace `exists = owner` with `has_owner = yes` inside planet_event trigger blocks.
+		r"(?s)^planet_event = \{.+?^\}$": [r"(\n\ttrigger = \{[^{}]*?)exists = owner\b", ("events", r"\1has_owner = yes")],
+		r"((\n\t+)any_owned_pop_group = \{([^\n{}]*|[\s\S]*?\2)\})$": [
+			r'(\s+)any_owned_pop_group( = \{(?:(\s+)(?:NOT|NOR|OR) = \{)?(?:\s+(?:(?:pop_group_)?has_trait = [\"\w]+|(?:is_(?:enslaved|sapient|psionic_species|scope_valid|robot_pop_group|robotic_species|subspecies)|has_(?:auto_modding|unplugged_positive|unplugged_negative|interesting_species)_trait) = (?:yes|no)|is_same_species = [\w:.]+)){1,5}(?(3)(\3| )\})(\1| )\})',
+			lambda m: (
+				m.group(1) +
+				"any_owned_species" +
+				m.group(2)
+					.replace('is_robot_pop_group', 'is_robotic')
+					.replace('is_robotic_species', 'is_robotic')
+					.replace('pop_group_has_trait', 'has_trait')	
+			)	
+		], # TODO
+		# r"^(\s*)NO[RT] = \{([\s\S]*?)\n\1\}\s*^\1([\w\._]+)\s*([<>]=?)\s*([\d\._@\w]+)\s*^\1NO[RT] = \{([\s\S]*?)^\1\}": _merge_not_nor_blocks,
+		r"(?:(\s+)(?:is_planet_class = pc_(?:frozen|ice_asteroid)|is_inside_nebula = yes)){3}": (("T", "can_have_exotic_gases_deposits"), r"\1can_have_exotic_gases_deposits = yes"),
 	}
 
 	targets4.update(tar4)
-	# END COSMETIC
+	# COSMETIC END
 
 def is_float(s):
 	try:
@@ -2119,39 +2331,40 @@ def iBox(title, prefil):  # , master
 	return answer
 
 # ============== Set paths ===============
-def extract_scripted_triggers() -> list:
+def extract_scripted_triggers() -> dict: # Changed return type hint to dict
 	"""
 	Scans the mod's 'common/scripted_triggers' directory and extracts the names
 	of defined scripted triggers.
 	Returns: custom_triggers = { <trigger-name>: <file-name> }
 	"""
 	custom_triggers = {}
-	triggers_dir = os.path.normpath(os.path.join(mod_path + "/common/scripted_triggers"))
+	triggers_dir = mod_path / "common" / "scripted_triggers" # Use Path objects
 	logger.debug(f"extract_scripted_triggers from: {triggers_dir}")
 
-	if len(triggers_dir) == 0 or not os.path.isdir(triggers_dir):
+	if not triggers_dir.is_dir(): # Check if it's a directory
 		logger.debug(f"No 'common/scripted_triggers' directory found in mod at {mod_path}.")
 		return custom_triggers
 
 	logger.debug(f"Scanning for scripted triggers in: {triggers_dir}")
 
-	for filepath in glob.glob(triggers_dir + "/*.txt", recursive=False):
+	# Use Path.glob for file discovery
+	for filepath in triggers_dir.glob("*.txt"): # recursive=False is default for Path.glob
 		try:
 			# Stellaris files often use UTF-8 with BOM, 'utf-8-sig' handles this
-			with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-				content = f.read()
+			# Use Path.read_text
+			content = filepath.read_text(encoding='utf-8', errors='ignore')
 
-				# Regex to find trigger names: a_trigger_name = { ... }
-				found_in_file = re.findall(r"^([a-zA-Z]\w+) = \{", content, re.M)
+			# Regex to find trigger names: a_trigger_name = { ... }
+			found_in_file = re.findall(r"^([a-zA-Z]\w+) = \{", content, re.M)
 
-				if found_in_file:
-					logger.debug(f"Found potential triggers in {filepath}: {found_in_file}")
-					for trigger_name in found_in_file:
-						custom_triggers[trigger_name] = os.path.basename(filepath)
+			if found_in_file:
+				logger.debug(f"Found potential triggers in {filepath.name}: {found_in_file}")
+				for trigger_name in found_in_file:
+					custom_triggers[trigger_name] = filepath.name # Use .name for just the filename
 		except Exception as e:
 			logger.error(f"❌ Can't read or parse scripted triggers from {filepath}: {e}")
 
-	logger.info(f"Discovered {len(custom_triggers)} unique custom scripted trigger(s) in the mod.")
+	logger.info(f"Discovered {len(custom_triggers)} unique custom scripted trigger in the mod.")
 	if custom_triggers:
 		logger.debug(f"Mod custom triggers: {custom_triggers}")
 	return custom_triggers
@@ -2203,7 +2416,7 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 		"merg_is_barren": (r"is_planet_class = pc_barren\b", (("T", "merg_is_barren"), "merg_is_barren = yes")),
 		"merg_is_barren_cold": (r"is_planet_class = pc_barren_cold\b", (("T", "merg_is_barren_cold"), "merg_is_barren_cold = yes")),
 		"merg_is_gaia_basic": (r"\b(is_planet_class = pc_gaia|pd_is_planet_class_gaia = yes)\b", (("T", "merg_is_gaia_basic"), "merg_is_gaia_basic = yes")),
-		"merg_is_gas_giant": (r"\b(is_planet_class = pc_gas_giant)\b", (("T", "merg_is_gas_giant"), "merg_is_gas_giant = yes")), 
+		"merg_is_gas_giant": (r"\b(is_planet_class = pc_gas_giant)\b", (("T", "merg_is_gas_giant"), "merg_is_gas_giant = yes")),
 		"merg_is_arcology": (r"\b(is_planet_class = pc_city\b|is_pd_arcology = yes|is_city_planet = yes)" , (("T", "merg_is_arcology"), "merg_is_arcology = yes")),
 	}
 	if not keep_default_country_trigger:
@@ -2266,8 +2479,6 @@ def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=Fals
 	if mergerofrules:
 		targets4.append((re.compile(r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % VANILLA_PREFIXES), r"\1"))
 
-	# print(tar3)
-	# print(tar4)
 	targets3.extend(tar3)
 	targets4.extend(tar4)
 
@@ -2282,8 +2493,8 @@ def convert_prescripted_countries_flags():
 	- Collecting `flags` blocks into separate files in the
 	`common/prescripted_flags` directory and replacing them with a key.
 	"""
-	countries_dir = os.path.join(mod_path, 'prescripted_countries')
-	if os.path.isdir(countries_dir):
+	countries_dir = mod_path / 'prescripted_countries' # Use Path objects
+	if countries_dir.is_dir():
 		logger.info("\n--- Running v4.0 Flag Conversion for Prescripted Countries ---")
 	else:
 		return
@@ -2291,9 +2502,9 @@ def convert_prescripted_countries_flags():
 	# Regex to find a 'flags = { ... }' block.
 	# It now captures the leading whitespace (indentation) in the first group.
 	# Using re.M to ensure '^' matches the start of each line.
-	flag_block_pattern = re.compile(r"^\s*flags\s*=\s*{([^}]*)}", re.M)
+	flag_block_pattern = re.compile(r"^\s*flags = {([^}]*)}", re.M)
 	# This pattern finds the `flag = "key"` lines to replace.
-	flag_key_pattern = re.compile(r'^\s*flag\s*=\s*"([^"\n]+)"', re.M)
+	flag_key_pattern = re.compile(r'^\s*flag = "([^"\n]+)"', re.M)
 	block_pattern = re.compile(r'^"?(\w+)"? = \{(.+?)^\}$', flags=re.DOTALL|re.M)
 	# A flag to track if we've made any changes at all
 	any_file_changed = False
@@ -2301,7 +2512,7 @@ def convert_prescripted_countries_flags():
 	modkey = ""
 	# This pattern finds the entire flags = { ... } block.
 	target_is_new_syntax = (ACTUAL_STELLARIS_VERSION_FLOAT > 3.99)
-	prescripted_flags_path = os.path.join(mod_path, "common", "prescripted_flags")
+	prescripted_flags_path = mod_path / "common" / "prescripted_flags" # Use Path objects
 
 	def extract_empire_shortname(block_key: str, block_content: str, flags: list) -> str:
 		"""
@@ -2354,18 +2565,18 @@ def convert_prescripted_countries_flags():
 			return shortname
 		return f"empire_{shortname}"
 
-	def get_modkey_from_path(filename: str) -> str:
+	def get_modkey_from_path(filepath_obj: Path) -> str: # Parameter changed to Path
 		"""
 		Derives a short mod(key) shortname from the prescripted country file.
 		Priority:
 		  1. Use filename (without extension)
 		  2. Fallback: from the mod folder path.
 		"""
-		filename = os.path.splitext(filename)[0]
-		modkey = re.sub(r"_prescripted_countr(?:y|ies)", "", filename, count=1)
+		filename_stem = filepath_obj.stem # Use .stem
+		modkey = re.sub(r"_prescripted_countr(?:y|ies)", "", filename_stem, count=1)
 
-		if filename == modkey:
-			modkey = re.sub(r"^(\w+?)[_ ].+", r"\1", filename, count=1)
+		if filename_stem == modkey:
+			modkey = re.sub(r"^(\w+?)[_ ].+", r"\1", filename_stem, count=1)
 
 		# Trim digits
 		modkey = re.sub(r"^\d*_?(\w+) ?", r"\1", modkey, count=1)
@@ -2375,7 +2586,7 @@ def convert_prescripted_countries_flags():
 
 		# Fallback modname
 		if len(modkey) < 3:
-			modkey = os.path.basename(mod_path)
+			modkey = mod_path.name # Use .name
 
 		# Sanitize: lowercase, replace spaces and dashes with underscores
 		modkey = re.sub(r'[^\w]', '_', modkey.lower(), count=1)
@@ -2386,24 +2597,24 @@ def convert_prescripted_countries_flags():
 		"""
 		Writes all collected flag data to a single prescripted_flags file.
 		"""
-		filename = ""
-		candidates = ""
+		filename = Path() # Initialized as Path object
+		candidates = [] # Changed to list of Path objects
 
-		if os.path.isdir(prescripted_flags_path):
+		if prescripted_flags_path.is_dir():
 			# Find existing *_empire_flags.txt files
-			candidates = [f for f in os.listdir(prescripted_flags_path) if f.endswith("_empire_flags.txt")]
+			candidates = [f for f in prescripted_flags_path.iterdir() if f.suffix == '.txt' and f.name.endswith("_empire_flags.txt")]
 			if candidates:
-				filename = os.path.join(prescripted_flags_path, candidates[0])  # pick first existing
+				filename = candidates[0]  # pick first existing
 		else:
-			os.makedirs(prescripted_flags_path, exist_ok=True)
+			prescripted_flags_path.mkdir(exist_ok=True) # Use Path.mkdir
 
 		if not filename:
-			filename = os.path.join(prescripted_flags_path, f"{modkey}_empire_flags.txt")
+			filename = prescripted_flags_path / f"{modkey}_empire_flags.txt" # Use Path / operator
 
 		# Load existing definitions if any
 		existing_flags = {}
-		if os.path.exists(filename):
-			with open(filename, "r", encoding="utf-8") as f:
+		if filename.exists(): # Use Path.exists
+			with filename.open("r", encoding="utf-8") as f: # Use Path.open
 				content = f.read()
 				block_pattern = re.compile(r'(\w+) = \{\s*flags = \{([^}]*)\}\s*\}', re.DOTALL)
 				for match in block_pattern.finditer(content):
@@ -2413,22 +2624,23 @@ def convert_prescripted_countries_flags():
 
 		merged_flags = {**existing_flags, **flags_dict}
 
-		with open(filename, "w", encoding="utf-8") as f:
+		with filename.open("w", encoding="utf-8") as f: # Use Path.open
 			f.write(f"# Generated/updated by Stellaris Mod Updater\n\n")
 			for empire in sorted(merged_flags.keys()):
 				flags_str = " ".join(merged_flags[empire])
 				f.write(f"{empire} = {{\n\tflags = {{ {flags_str} }}\n}}\n")
 
 		if candidates:
-			print(f"✔ Updated prescripted flags file {filename}")
+			print(f"✔ Updated prescripted flags file {filename.name}") # Use .name
 		else:
-			print(f"✔ Created new prescripted flags file {filename}")
+			print(f"✔ Created new prescripted flags file {filename.name}") # Use .name
 
-	for filename in os.listdir(countries_dir):
-		filepath = os.path.join(countries_dir, filename)
-		if os.path.isfile(filepath):
+	for filepath_obj in countries_dir.iterdir(): # Use Path.iterdir
+		filename = filepath_obj.name # Get name from Path object
+		filepath = filepath_obj # filepath is now a Path object
+		if filepath.is_file(): # Use Path.is_file
 			try:
-				with open(filepath, 'r', encoding='utf-8-sig') as f:
+				with filepath.open('r', encoding='utf-8-sig') as f: # Use Path.open
 					content = f.read()
 				file_modified_in_this_pass = False
 				# --- UPGRADE LOGIC ---
@@ -2464,17 +2676,17 @@ def convert_prescripted_countries_flags():
 					def _downgrade_replacer(match: re.Match) -> str:
 						key = match.group(1)
 						found_flags_block = None
-						if not os.path.isdir(prescripted_flags_path):
+						if not prescripted_flags_path.is_dir(): # Use Path.is_dir
 							print(f"Warning: Directory '{prescripted_flags_path}' not found. Cannot perform downgrade.")
 							return match.group(0)
-						for filename in os.listdir(prescripted_flags_path):
-							filepath = os.path.join(prescripted_flags_path, filename)
-							if not os.path.isfile(filepath):
+						for flag_filepath_obj in prescripted_flags_path.iterdir(): # Use Path.iterdir
+							filepath = flag_filepath_obj # filepath is now a Path object
+							if not filepath.is_file(): # Use Path.is_file
 								continue
 							try:
-								with open(filepath, "r", encoding="utf-8-sig") as f:
+								with filepath.open("r", encoding="utf-8-sig") as f: # Use Path.open
 									file_content = f.read()
-								key_block_pattern = re.compile(rf'^{re.escape(key)}\s*=\s*\{{[\s\S]+?^\s*\}}', re.M)
+								key_block_pattern = re.compile(rf'^{re.escape(key)} = \{{[\s\S]+?^\s*\}}', re.M)
 								key_block_match = key_block_pattern.search(file_content)
 								if key_block_match:
 									key_block_content = key_block_match.group(0)
@@ -2483,10 +2695,10 @@ def convert_prescripted_countries_flags():
 										found_flags_block = flags_match.group(0).strip()
 										break  # Found it, no need to search more files
 									else:
-										print(f"Warning: Found key '{key}' in '{filename}' but it had no inner 'flags' block. Skipping.")
+										print(f"Warning: Found key '{key}' in '{filepath.name}' but it had no inner 'flags' block. Skipping.") # Use .name
 										return match.group(0) # Returning original line to be safe.
 							except IOError as e:
-								print(f"Error: Could not read file '{filepath}'. {e}")
+								print(f"Error: Could not read file '{filepath.name}'. {e}") # Use .name
 								continue
 						if found_flags_block:
 							return f"\t{found_flags_block}"
@@ -2500,8 +2712,8 @@ def convert_prescripted_countries_flags():
 
 				if file_modified_in_this_pass:
 					any_file_changed = True
-					modkey = get_modkey_from_path(filename) # Later, to write the prescripted_flags
-					with open(filepath, 'w', encoding='-utf-8-sig') as f:
+					modkey = get_modkey_from_path(filepath) # Later, to write the prescripted_flags
+					with filepath.open('w', encoding='utf-8-sig') as f: # Use Path.open and correct encoding
 						f.write(content)
 
 			except Exception as e:
@@ -2514,29 +2726,33 @@ def convert_prescripted_countries_flags():
 		logger.info("--- v4.0 Flag Conversion Complete ---\n")
 
 def parse_dir():
-	global mod_path, mod_outpath, log_file, start_time, exclude_paths #, targets3, targets4
+	global mod_path, mod_outpath, log_file, start_time, exclude_paths
 
 	files = []
-	mod_path = os.path.normpath(mod_path)
+	mod_path = Path(mod_path).resolve()
 
 	print(f"Welcome to Stellaris Mod-Updater-{FULL_STELLARIS_VERSION} by FirePrince!")
 
 	if (
-		not os.path.isdir(mod_path) or
-		not any(os.path.exists(os.path.join(mod_path, comp)) for comp in ["descriptor.mod", "common", "events"])
+		not mod_path.is_dir() or
+		not any((mod_path / comp).exists() for comp in ["descriptor.mod", "common", "events"])
 		):
-		mod_path = os.getcwd() if not os.path.isdir(mod_path) else mod_path
-		mod_path = iBox("Please select a mod folder:", mod_path)
-		mod_path = os.path.normpath(mod_path)
+		mod_path = Path.cwd() if not mod_path.is_dir() else mod_path
+		mod_path_str = iBox("Please select a mod folder:", str(mod_path))
+		if mod_path_str:
+			mod_path = Path(mod_path_str).resolve()
+		else:
+			print("No folder selected. Aborting.")
+			sys.exit()
 
-	if not os.path.isdir(mod_path):
+	if not mod_path.is_dir():
 		# except OSError:
 		#   print('Unable to locate the mod path %s' % mod_path)
 		mBox("Error", "Unable to locate the mod path %s" % mod_path)
 		return False
 	if (
-		len(mod_outpath) < 1
-		or not os.path.isdir(mod_outpath)
+		not mod_outpath or
+		not mod_outpath.is_dir()
 		or mod_outpath == mod_path
 	):
 		mod_outpath = mod_path
@@ -2545,37 +2761,19 @@ def parse_dir():
 		else:
 			print("WARNING: Mod files will be overwritten!")
 	else:
-		mod_outpath = os.path.normpath(mod_outpath)
+		mod_outpath = Path(mod_outpath).resolve()
 
-	exclude_paths = [os.path.normpath(os.path.join(mod_path, "common", e)) for e in exclude_paths]
+	exclude_paths = [mod_path / "common" / e for e in exclude_paths]
 
 	# Using the custom formatter
 	# Prevent adding multiple handlers if this setup code is run more than once
 	if logger.handlers or logger.hasHandlers():
 		logger.debug("Logger handler already exists")
 		logger.handlers.clear()
-
 	# Create a handler for sys.stdout
 	stdout_handler = logging.StreamHandler(sys.stdout)
 	stdout_handler.setLevel(logging.INFO)
 	stdout_handler.setFormatter(SafeFormatter('%(levelname)s - %(message)s'))
-
-	def add_logfile_handler():
-		global log_file
-		if log_file and log_file != "":
-			# Open the log file in append mode
-			# print(f"mod_outpath: {mod_outpath}, log_file: {log_file}")
-			log_file = os.path.join(mod_outpath, log_file)
-			if os.path.exists(log_file):
-				os.remove(log_file)
-			# log_file = open(log_file, "w", encoding="utf-8", errors="ignore")
-			# Create a handler for your existing log_file object
-			log_file = logging.FileHandler(log_file, mode='a', encoding='utf-8', errors='replace')
-			# We use StreamHandler because log_file is an already open file stream
-			# log_file = logging.StreamHandler(log_file)
-			log_file.setLevel(logging.DEBUG if debug_mode else logging.INFO)
-			log_file.setFormatter(logging.Formatter('%(levelname)s - %(message)s')) # '%(asctime)s -
-			logger.addHandler(log_file)
 
 	logger.addHandler(stdout_handler)
 
@@ -2584,23 +2782,18 @@ def parse_dir():
 		logger.debug("\tLoading folder %s" % mod_path)
 	start_time = time.perf_counter() # datetime.datetime.now()
 
-	# if os.path.isfile(mod_path + os.sep + 'descriptor.mod'):
-	if any(os.path.exists(os.path.join(mod_path, comp)) for comp in ["descriptor.mod", "common", "events"]):
-		# files = glob.glob(mod_path + "/**", recursive=True)  # '\\*.txt'
-		files = glob.glob(mod_path + "/common/**", recursive=True)
-		files.extend(glob.glob(mod_path + "/events/*.txt", recursive=False))
-		add_logfile_handler()
+	if any((mod_path / comp).exists() for comp in ["descriptor.mod", "common", "events"]):
+		files = list((mod_path / "common").rglob("*"))
+		files.extend((mod_path / "events").glob("*.txt"))
 		modfix(files)
-
 	else:
 		# "We have a main or a sub folder"
-		# folders = [f for f in os.listdir(mod_path) if os.path.isdir(os.path.join(mod_path, f))]
-		folders = glob.iglob(mod_path + "/*/", recursive=False)
-		basename = os.path.basename(mod_path)
+		folders = list(p for p in mod_path.iterdir() if p.is_dir())
+		basename = mod_path.name
 		# print(basename)
 		# print(list(folders))
-		if basename == "common" or next(folders, -1) == -1:
-			files = glob.glob(mod_path + "/**", recursive=True)  # '\\*.txt'
+		if basename == "common" or not folders:
+			files = list(mod_path.rglob("*"))
 			# print(files)
 			if (
 				not files
@@ -2610,46 +2803,64 @@ def parse_dir():
 				logger.warning("Empty folder %s." % mod_path)
 			else:
 				logger.warning("We have clear a sub-folder.")
-				outpath = ""
-				if "common/" in mod_path:
-					outpath = mod_path.split("common/")
-					if len(outpath) > 1:
-						outpath, basename = outpath
-						basename = f"common/{basename}"
-					else:
-						outpath = outpath[0]
+				outpath = Path()
+				basename = ""
+				if "common" in mod_path.parts:
+					common_index = mod_path.parts.index("common")
+					outpath = Path(*mod_path.parts[:common_index])
+					basename = str(Path(*mod_path.parts[common_index:]))
 				else:
-					outpath, basename = os.path.split(mod_path)
+					outpath = mod_path.parent
+					basename = mod_path.name
 
 				if mod_outpath == mod_path:
 					mod_outpath = outpath
 					logger.warning(f"New output folder {mod_outpath}")
 
-				add_logfile_handler()
-				modfix(files, basename)
+				modfix(files, str(basename))
 		else:
-			add_logfile_handler()
-			logger.debug("We have a main-folder?")
+			logger.debug("We have a main-folder? {_f}")
+			original_outpath = mod_outpath
 			for _f in folders:
-				if os.path.exists(os.path.join(_f, "descriptor.mod")):
-					mod_path = _f
-					mod_outpath = os.path.join(mod_outpath, _f)
-					logger.info(mod_path)
-					# files = glob.glob(mod_path + "/**", recursive=True)  # '\\*.txt'
-					files = glob.glob(mod_path + "/common/**", recursive=True)
-					files.extend(glob.glob(mod_path + "/events/*.txt", recursive=False))
+				mod_path = _f
+				logger.info(mod_path)
+				mod_outpath = original_outpath / _f.name
+				if (_f / "descriptor.mod").exists():
+					files = list((mod_path / "common").rglob("*"))
+					files.extend((mod_path / "events").glob("*.txt"))
 					modfix(files)
 				else:
-					# files = glob.glob(mod_path + "/**", recursive=True)  # '\\*.txt'
-					files = glob.glob(mod_path + "/common/**/*.txt", recursive=True)
-					files.extend(glob.glob(mod_path + "/events/*.txt", recursive=False))
-					if next(iter(files), -1) != -1:
+					files = list((mod_path / "common").rglob("*"))
+					files.extend((mod_path / "events").glob("*.txt"))
+					if files:
 						logger.warning("We have probably a mod sub-folder.")
 						modfix(files)
 					else:
 						logger.warning("No Mod structure found!")
 
+def add_logfile_handler():
+	global log_file, mod_outpath, debug_mode
+	for handler in logger.handlers[:]:
+		if isinstance(handler, logging.FileHandler):
+			handler.close()
+			logger.removeHandler(handler)
+	if log_file:
+		# Open the log file in append mode
+		print(f"mod_outpath: {mod_outpath}, log_file: {log_file}")
+		log_file_path = mod_outpath / log_file
+		if log_file_path.exists():
+			log_file_path.unlink()
+		# log_file = open(log_file, "w", encoding="utf-8", errors="ignore")
+		# Create a handler for your existing log_file object
+		file_handler = logging.FileHandler(log_file_path, mode='a', encoding='utf-8', errors='replace')
+		# We use StreamHandler because log_file is an already open file stream
+		# log_file = logging.StreamHandler(log_file)
+		file_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+		file_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s')) # '%(asctime)s -
+		logger.addHandler(file_handler)
+
 def modfix(file_list, is_subfolder=False):
+	add_logfile_handler()
 	logger.debug(f"mod_path: {mod_path}\nmod_outpath: {mod_outpath}\nfile_list: {file_list}")
 
 	convert_prescripted_countries_flags()
@@ -2661,6 +2872,8 @@ def modfix(file_list, is_subfolder=False):
 	else:
 		# Cleanup is_country_type = default
 		tar4.append((re.compile(r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)is_country_type = default\s*" % VANILLA_PREFIXES), r"\1"))
+		# Cleanup is_galactic_community_member
+		tar4.append((re.compile(r"((?:%s)_galcom_member = \{[^{}#]*?(?:limit = \{\s+)?)is_galactic_community_member = yes\s*" % VANILLA_PREFIXES), r"\1"))
 
 	logger.debug(f"len tar3={len(tar3)} len tar4={len(tar4)}:\n{tar3}")
 	subfolder = ""
@@ -2677,7 +2890,7 @@ def modfix(file_list, is_subfolder=False):
 	]
 
 	# "resolutions", "situations" not working because modifier desc
-	WEIGHT_FOLDERS = ("technology", "ai_budget", "megastructures", "policies", "pop_faction_types", "solar_system_initializers", "tradition_categories", "events", "species_rights", "scripted_effects", "inline_scripts")
+	WEIGHT_FOLDERS = ("technology", "ai_budget", "anomalies", "megastructures", "policies", "pop_faction_types", "solar_system_initializers", "tradition_categories", "events", "species_rights", "scripted_effects", "inline_scripts")
 	TARGETS_TRAIT = {
 		re.compile(r"\badd_trait = \"?(\w+)\"?\b"): r"add_trait = { trait = \1 }",
 		re.compile(r"\badd_trait_no_notify = \"?(\w+)\"?\b"): r"add_trait = { trait = \1 show_message = no }",
@@ -2696,11 +2909,12 @@ def modfix(file_list, is_subfolder=False):
 
 	def clean_by_blanking(lines: list[str]) -> Tuple[list, bool]:
 		"""
-		Cleans code by replacing non-code lines with blank lines,
-		preserving the original line count.
+		DEPRECATED: Cleans code by replacing non-code lines with blank lines,
+		preserving the original line count. Now handled by logic_optimizer.
 		"""
 		cleaned_lines = []
 		for line in lines:
+			# Isolate content from comments
 			if not line.strip() or line.strip().startswith('#'):
 				cleaned_lines.append('')
 			else:
@@ -2710,11 +2924,12 @@ def modfix(file_list, is_subfolder=False):
 
 	def apply_inline_replacement(lines: List[str], need_clean_code: bool, match: re.Match, replace: tuple, sr: bool ) -> Tuple[List[str], bool]:
 		"""
-		Performs a precise, character-based replacement for a given match,
-		preserving indentation and surrounding text.
+		DEPRECATED: Performs a precise, character-based replacement for a given match,
+		preserving indentation and surrounding text. Now handled by logic_optimizer.
 		"""
 		nonlocal changed, cleaned_code
 		new_content = ""
+		# Isolate content from comments
 		# Get global character positions from the match
 		if sr and match.groups(): # Does only count capturing groups
 			tar = match.group(1) # Take only first group
@@ -2737,9 +2952,12 @@ def modfix(file_list, is_subfolder=False):
 		# 	start_char += match_span[0]
 		# else:
 		# 	new_content = False
+		# try:
 		new_content, rt = replace[0].subn(replace[1], tar, count=1)
+		# except: print(f"{basename} lines {len(lines)}:\n'{tar}':\n'{new_content}'\n{replace[0].pattern}")
+
 		if rt != 1:
-			new_content = False
+			return lines, need_clean_code
 		if new_content and (isinstance(new_content, str) and isinstance(tar, str) and tar != new_content):
 			common_prefix_len = 0
 			if tar.startswith('\n') and new_content.startswith('\n'):
@@ -2765,35 +2983,39 @@ def modfix(file_list, is_subfolder=False):
 				end_col = end_char - end_col # Calculate the column numbers
 			# For the end character, we look at the character just before it to get the correct line.
 			end_line_idx = cleaned_code[:end_char - 1].count('\n') if end_char > 0 else 0
-			# print(f"{basename} lines {len(lines)} ({start_line_idx}-{end_line_idx}):\n'{tar}':\n'{new_content}'\n{replace[0].pattern}") # DEBUG
+			if debug_mode:
+				print(f"{basename} lines {len(lines)} ({start_line_idx}-{end_line_idx}):\n'{tar}':\n'{new_content}'\n{replace[0].pattern}") # DEBUG
 
 			# --- Perform the line stitching ---
 			if end_col != "":
-				end_col = lines[end_line_idx][end_col:]
+				# Use a version of the line with the comment stripped to prevent duplication.
+				last_line_content = lines[end_line_idx]
+				end_col = last_line_content.split('#', 1)[0].rstrip()[end_col:]
 			if start_col != "":
+				# We don't need to strip comments from the start, as they are handled by the main logic.
 				start_col = lines[start_line_idx][:start_col]
 
 			# lines_len_after = cleaned_code.count('\n') + 1
 			## Simultaneously, update the cleaned code with a string slice (OPTIMIZATION: omits steady clean_by_blanking)
 			cleaned_code = cleaned_code[:start_char + common_prefix_len] + new_content + cleaned_code[end_char:]
 			# cleaned_lines = cleaned_code.splitlines() # DEBUG
-			# # # DEBUG
-			# lines_len_before = len(cleaned_lines) # DEBUG
-			# lines_len_after = cleaned_code.count('\n') + 1
-			# if lines_len_after != lines_len_before:
-			# 	logger.debug(f"lines_len_before {lines_len_after} == {lines_len_before}")
-			# cleaned_lines, need_clean_code = clean_by_blanking(cleaned_lines)
-			# cleaned_code = '\n'.join(cleaned_lines)
-			# lines_len_after = len(cleaned_lines) # DEBUG
-			# lines_len_before = cleaned_code.count('\n') + 1
-			# if lines_len_after != lines_len_before: # Should never happen
-			# 	logger.debug(f"lines_len_after {lines_len_before} == {lines_len_after} {len(lines)}")
-			# print(f"({lines_len_after} - {len(lines)}) original_block from cleaned code: {cleaned_lines[start_line_idx : end_line_idx + 1]}")
+			### DEBUG
+			# if debug_mode:
+			# 	lines_len_before = len(cleaned_lines) # DEBUG
+			# 	lines_len_after = cleaned_code.count('\n') + 1
+			# 	if lines_len_after != lines_len_before:
+			# 		logger.debug(f"lines_len_before {lines_len_after} == {lines_len_before}")
+			# 	cleaned_lines, need_clean_code = clean_by_blanking(cleaned_lines)
+			# 	cleaned_code = '\n'.join(cleaned_lines)
+			# 	lines_len_after = len(cleaned_lines) # DEBUG
+			# 	lines_len_before = cleaned_code.count('\n') + 1
+			# 	if lines_len_after != lines_len_before: # Should never happen
+			# 		logger.debug(f"lines_len_after {lines_len_before} == {lines_len_after} {len(lines)}")
+			# 	print(f"({lines_len_after} - {len(lines)}) original_block from cleaned code: {cleaned_lines[start_line_idx : end_line_idx + 1]}")
+			# 	print("original_block",lines[start_line_idx : end_line_idx + 1])
+			# 	print(f"new_block: '{start_col}' + '{new_content}' + '{end_col}'")
 
-			# print("original_block",lines[start_line_idx : end_line_idx + 1])
-			# print(f"new_block: '{start_col}' + '{new_content}' + '{end_col}'")
 			new_content = start_col + new_content + end_col
-
 			# --- Trim identical lines (from Start and End) FIRST by comparing cleaned versions ---
 			def clean_lines_for_comparison(line_list: List[str]) -> List[str]:
 				"Similar to clean_by_blanking"
@@ -2817,36 +3039,54 @@ def modfix(file_list, is_subfolder=False):
 				common_prefix_len += 1
 				# print("common_prefix_len +",common_prefix_len)
 
-			# common_suffix_len = 0
-			# while (common_suffix_len + common_prefix_len < len(cleaned_original_block) and
-			# 	   common_suffix_len + common_prefix_len < len(cleaned_new_block) and
-			# 	   cleaned_original_block[-(common_suffix_len + 1)] == cleaned_new_block[-(common_suffix_len + 1)]):
-			# 	common_suffix_len += 1
+			common_suffix_len = 0
+			while (common_suffix_len + common_prefix_len < len(cleaned_original_block) and
+				   common_suffix_len + common_prefix_len < len(cleaned_new_block) and
+				   cleaned_original_block[-(common_suffix_len + 1)] == cleaned_new_block[-(common_suffix_len + 1)]):
+				common_suffix_len += 1
 
 			# --- Comment Preservation Block (now operates on the smaller, trimmed blocks) ---
 			# Get the minimal blocks that actually changed
-			original_block_lines = original_block_lines[common_prefix_len : ] # len(original_block_lines)- common_suffix_len # minimal_original_block
-			new_content_lines = new_content_lines[common_prefix_len : ] # len(new_content_lines) - common_suffix_len  # minimal_new_block_lines
+			original_block_lines = original_block_lines[common_prefix_len : len(original_block_lines) - common_suffix_len] # minimal_original_block
+			new_content_lines = new_content_lines[common_prefix_len : len(new_content_lines) - common_suffix_len]  # minimal_new_block_lines
 			start_line_idx += common_prefix_len # final_start_idx
-			# end_line_idx -= common_suffix_len + 1 # slice_to_remove_end_idx
+			end_line_idx -= common_suffix_len # slice_to_remove_end_idx
 
 			# Handle the simple case first: a single-line match is purely character-based.
-			if start_line_idx == end_line_idx: # SINGLE-LINE match
+			if len(new_content_lines) == 1: # SINGLE-LINE match (can be from multi-line) start_line_idx == end_line_idx
 				original_block = '\n'.join(original_block_lines)
 				new_content = '\n'.join(new_content_lines)
 				if original_block != new_content:
+					original_is_larger = False
 					if len(new_content_lines) != len(original_block_lines):
-						need_clean_code = True
+						original_is_larger = need_clean_code = True
+					# Preserve comments from the first line of the original block
+					if '#' in original_block:
+						if original_is_larger and '#' in original_block_lines[0]:
+							code_part = original_block_lines[0].split('#', 1)
+							code_part = code_part[0].rstrip()
+							if code_part: # Ensure there was code before the comment
+								new_content_lines[0] += original_block_lines[0][len(code_part):]
+							else: # Lonely comment
+								new_content_lines.insert(0, original_block_lines[0])
+						else:
+							code_part = original_block.split('#', 1)
+							code_part = code_part[0].rstrip()
+							if code_part:
+								new_content_lines[0] += original_block[len(code_part):]
+					lines = lines[:start_line_idx] + new_content_lines + lines[end_line_idx + 1:]
 					changed = True
-					lines = lines[:start_line_idx] + new_content_lines + lines[start_line_idx + 1:]
 					logger.info(f"SINGLE-LINE match ({start_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 			else: # MULTI-LINE match
 				# --- Comment Preservation Block ---
-				comment_map = {}
-				orphan_comments = []
+				comment_map = {} # Inline comments
+				orphan_comments = {} # full line comments and previous line as key
 				# print(f"original_block_lines: {lines[start_line_idx : end_line_idx + 1]}")
 				# cleaned_code_block_lines = tar.split('\n')
 				# print(f"cleaned_code_block_lines: {cleaned_code_block_lines}")
+				prev_line = ''
+				comment_to_instert = None
+				comments_to_append = []
 				# Collect all comments in a single loop
 				for line in original_block_lines:
 					if '#' in line:
@@ -2855,65 +3095,116 @@ def modfix(file_list, is_subfolder=False):
 						if code_key:  # Only map if there's actual code on the line
 							comment_map[code_key] = line[len(parts[0]):] # Store the comment
 						else: # Full line
-							orphan_comments.append(line)
+							if prev_line:
+								prev_line = prev_line.strip()
+								orphan_comments[prev_line] = line.rstrip()
+							else:
+								comment_to_instert = line
+					prev_line = line
 
-				used_comment_keys = set()
+				def find_comment_match(comment_map, gap=" "):
+					"Find the best possible new line for each remaining comment."
+					nonlocal new_content_lines
+					used_comment_keys = set()
+					best_matches = {} # { original_key: (best_new_line_index, match_length) }
+					# 1. Check if the new line's code is a SUBSET of an original commented line.
+					# This handles cases like `owner = { X }` becoming just `X`.
+					for original_key, comment in list(comment_map.items()):
+						if not comment_map: break
+						# print(f"original_key {original_key}: used_comment_keys={used_comment_keys} comment_map={comment_map}") # DEBUG
+						if original_key in used_comment_keys:
+							continue
+						best_match_for_key = (-1, 0) # (index, length)
+
+						for i, new_line in enumerate(new_content_lines):
+							stripped_new_line = new_line.strip()
+							if stripped_new_line in ('}','{'): continue
+							# print(f"{i}, {new_line} KEY={original_key}")
+							if stripped_new_line == original_key:
+								if original_key not in comment_map:
+									continue
+								# print("COMMENT MATCH", i, stripped_new_line) # DEBUG
+								new_content_lines[i] = new_line + gap + comment_map[original_key] # FIXME KeyError: '}'
+								if gap == '\n' and i+1 < len(new_content_lines) and not new_content_lines[i+1].strip():
+									del new_content_lines[i+1]
+								used_comment_keys.add(original_key) # Mark as used
+								del comment_map[original_key]
+								continue
+							# If no exact match, try to match the part before " = " for triggers like `has_origin = origin_remnants`
+							if stripped_new_line.endswith(('yes', 'no')): # ' = ' in stripped_new_line
+								new_line_key1, new_line_key2 = stripped_new_line.split(' = ', 1)
+								new_line_key1 = new_line_key1.strip()
+								new_line_key2 = new_line_key2.strip()
+								if new_line_key1:
+									# Create a copy to iterate over while potentially modifying the original
+									for org_key, comment in list(comment_map.items()):
+										if org_key in used_comment_keys: continue
+										if org_key.endswith(('yes', 'no')):
+											org_key1, org_key2 = org_key.split(' = ', 1)
+											if new_line_key1 == org_key1.strip(): # and (new_line_key2 == org_key2.strip() or org_key2.strip() in ('yes', 'no'))
+												new_content_lines[i] += gap + comment
+												used_comment_keys.add(org_key)
+												del comment_map[org_key]
+												break # Found a good match, move to next new line
+							else: # --- Fallback Logic ---
+								# If the new code is a substring of the old code, it's a strong candidate.
+								if stripped_new_line in original_key:
+									# print("stripped_new_line in original_key", stripped_new_line, original_key)
+									match_len = len(stripped_new_line)
+									if not stripped_new_line.endswith(('{', '}')):
+										match_len *= 2
+									# Prioritize longer (more specific) matches
+									if match_len > best_match_for_key[1]:
+										best_match_for_key = (i, match_len)
+
+						if best_match_for_key[0] != -1:
+							best_matches[original_key] = best_match_for_key
+
+					# Apply the best matches found
+					for original_key, (line_idx, _) in best_matches.items():
+						if original_key in used_comment_keys: continue
+						comment_to_add = comment_map[original_key]
+						new_content_lines[line_idx] += " " + comment_to_add
+						used_comment_keys.add(original_key)
+						del comment_map[original_key]
+						# print("re-attached comment", new_content_lines[line_idx])
+
+					# Collect remaining orphan comments from changed code lines
+					comment_list = []
+					if comment_map:
+						for original_key, comment in comment_map.items():
+							if not used_comment_keys or original_key not in used_comment_keys:
+								# orphan_comments[original_key] = comment # don't add it elsewhere
+								logger.warning(f"Orphaned comment '{comment}' removed from '{original_key}'!")
+							else: comment_list.append(comment)
+						return comment_list
+
 				# 1. Re-attach comments to identical lines by appending the comment part
 				if comment_map:
-					for i, new_line in enumerate(new_content_lines):
-						stripped_new_line = new_line.strip()
-						if not comment_map: break
-						if stripped_new_line in comment_map:
-							# Append the original comment instead of replacing the whole line
-							new_content_lines[i] = new_line + " " + comment_map[stripped_new_line]
-							used_comment_keys.add(stripped_new_line)
-							del comment_map[stripped_new_line]
-							continue
-						# If no exact match, try to match the part before " = "
-						elif ' = ' in stripped_new_line:
-							new_line_key1, new_line_key2 = stripped_new_line.split(' = ', 1)
-							new_line_key1 = new_line_key1.strip()
-							new_line_key2 = new_line_key2.strip()
-							if not new_line_key1: continue
-							# Only proceed if we have a valid key to search for
-							elif new_line_key1:
-								for original_key in comment_map:
-									if original_key in used_comment_keys:
-										del comment_map[original_key]
-										continue
-									elif ' = ' in original_key:
-										org_key1, org_key2 = original_key.split(' = ', 1)
-										org_key1 = org_key1.strip()
-										org_key2 = org_key2.strip()
-										if new_line_key1 in org_key1:
-											if new_line_key2 in org_key2 or org_key2 == 'yes' or org_key2 == 'no':
-												new_content_lines[i] = new_line + " " + comment_map[original_key]
-												used_comment_keys.add(original_key)
-												del comment_map[original_key]
-												break # Found match, exit inner loop
-					# Collect remaining orphan comments from changed code lines
-					if comment_map:
-						for original_key, comment_part in comment_map.items():
-							if original_key not in used_comment_keys:
-								orphan_comments.append(comment_part)
+					comments_to_append = find_comment_match(comment_map)
+
 				# --- End of Comment Preservation Block ---
-				if orphan_comments:
-					comment_map = '\n\t'.join(orphan_comments)
-					logger.warning(f"Some code comments may lost:\n{comment_map}")
-					# Just put comment on the first line or better before the first line!?
-					if len(orphan_comments) == 1 and new_content_lines[0]:
-						new_content_lines[0] = f"{new_content_lines[0]} {orphan_comments[0]}"
-					else:
-						# TODO very buggy
-						# Determine indentation for orphan comments from the original block's structure
-						indentation = ''
-						need_clean_code = True
-						for line in original_block_lines:
-							if line.strip() and line.startswith("\t"):
-								indentation = line[:len(line) - len(line.lstrip())]
-								break
-						orphan_comments = [f"{indentation} {comment.strip()}" for comment in orphan_comments]
-						new_content_lines = orphan_comments + new_content_lines
+				if orphan_comments and new_content_lines:
+					# Determine indentation from the original block's structure
+					indentation = ''
+					for line in original_block_lines:
+						if line.strip() and line.startswith("\t"):
+							indentation = line[:len(line) - len(line.lstrip())]
+							break
+
+					orphan_comments = find_comment_match(orphan_comments, gap='\n')
+					# Create a clean list of comments to append
+					if orphan_comments:
+						for comment in orphan_comments:
+							comments_to_append.apped(f"{indentation}{comment.strip()}")
+
+					# Add the comments to the new content
+					if comment_to_instert: new_content_lines.insert(0, comment_to_instert)
+					if comments_to_append:
+						comments_to_append = '\n'.join(comments_to_append)
+						logger.warning(f"Orphaned comments moved to the end of the block:\n{comments_to_append}")
+						new_content_lines.extend(comments_to_append)
+					need_clean_code = True
 
 				new_content = '\n'.join(new_content_lines)
 				original_block = '\n'.join(original_block_lines)
@@ -2928,7 +3219,6 @@ def modfix(file_list, is_subfolder=False):
 					)
 					logger.info(f"MULTI-LINE match ({start_line_idx}-{end_line_idx}):\n'{original_block}' with:\u2935\n'{new_content}'")
 				else:
-					# need_clean_code = False
 					logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
 		else:
 			logger.debug(f"BLIND MATCH: '{tar}' {replace} {type(replace)} {basename}")
@@ -2971,7 +3261,7 @@ def modfix(file_list, is_subfolder=False):
 		return lines, changed
 
 	# This regex finds all top-level wg_* blocks.
-	wg_block_pattern = re.compile(r"^wg_\w+\s*=\s*\{.+?^\}", flags=re.DOTALL|re.M)
+	wg_block_pattern = re.compile(r"^wg_\w+ = \{.+?^\}", flags=re.DOTALL|re.M)
 
 	def transform_war_goals_syntax(lines: List[str], valid_lines: List[bool], changed: bool, target_version_is_v4: bool) -> Tuple[List[str], List[bool], bool]:
 		"""
@@ -2998,8 +3288,8 @@ def modfix(file_list, is_subfolder=False):
 		# Define the complete set of all possible peace offers for efficient set operations.
 		ALL_PEACE_OFFERS = set(PEACE_OFFERS_ORDER)
 		file_content = "\n".join(lines)
-		forbidden_pattern = re.compile(r"^\tforbidden_peace_offers\s*=\s*\{([^{}]+)\}", re.M)
-		allowed_pattern = re.compile(r"^\tallowed_peace_offers\s*=\s*\{[^{}]*?\}", re.M)
+		forbidden_pattern = re.compile(r"^\tforbidden_peace_offers = \{([^{}]+)\}", re.M)
+		allowed_pattern = re.compile(r"^\tallowed_peace_offers = \{[^{}]*?\}", re.M)
 
 		def _downgrade_replacer(match: re.Match) -> str:
 			"--- Replacer function for DOWNGRADING to v3.* ---"
@@ -3037,7 +3327,7 @@ def modfix(file_list, is_subfolder=False):
 
 				# If no preferred line, find the first sub-block (e.g., "potential = {") to insert BEFORE.
 				if insertion_index == -1:
-					sub_block_pattern = re.compile(r'^\t\w+\s*=\s*\{')
+					sub_block_pattern = re.compile(r'^\t\w+ = \{')
 					for i, line in enumerate(block_lines[1:], start=1): # Skip the 'wg_* = {' line.
 						if sub_block_pattern.match(line):
 							insertion_index = i
@@ -3193,18 +3483,18 @@ def modfix(file_list, is_subfolder=False):
 		return lines, valid_lines, changed
 
 	find_re_comm = re.compile(
-		r'^(\t)(?:weight(?:_modifier)?|[Aa][Ii]_weight|monthly_progress|usage_odds|ai_will_do) = \{(.+?)^\1\}',
+		r'^(\t)(?:weight(?:_modifier)?|[Aa][Ii]_weight|monthly_progress|usage_odds|ai_will_do|spawn_chance) = \{(.+?)^\1\}',
 		flags=re.DOTALL|re.M
 	)
 	find_re_evnt = re.compile(r'^(\t+)random_list = \{(.+?)^\1\}', flags=re.DOTALL|re.M)
-	find_re_list = re.compile(r'^(\t+)\d+ = \{(.+?)^\1\}', flags=re.DOTALL|re.M)
-	mod_re_block = re.compile(r'^(\t+)modifier = \{(.+?)^\1\}', flags=re.DOTALL|re.M)
-	# find_re_list = re.compile(r'^(\t+)\d+ = \{([^{}]*?(?:\{[^{}]*\}[^{}]*?)*?)\}',flags=re.DOTALL)
+	find_re_list = re.compile(r'^(\t+)\d+ = \{(.+?)^\1\}', flags=re.DOTALL|re.M) # r'^(\t+)\d+ = \{([^{}]*?(?:\{[^{}]*\}[^{}]*?)*?)\}'
+	mod_re_block = re.compile(r'^(\t+)modifier = \{( |\n\1)(.+?)\2\}$', flags=re.DOTALL|re.M)
 	def merge_factor0_modifiers(text: str, changed: bool) -> tuple:
 		"""
 		Merge multiple `modifier = { factor = 0 ... }` blocks into a single one
 		with an OR = { ... } condition.
 		Works on any scope, not just ai_weight.
+		group(1) is the indention
 		"""
 
 		def repl(match_parent):
@@ -3218,12 +3508,12 @@ def modfix(file_list, is_subfolder=False):
 			abs_match_start = match_parent.start()
 			block_coords = (match_parent.start(2) - abs_match_start, match_parent.end(2) - abs_match_start)
 			match_parent = match_parent.group(0)
-			mod_zero_re = re.compile(r'(%s)modifier = \{(\s*#[^\n]+\n)?\s+factor = 0(?:\.0+)?\s+(.+?)\1\}\n*?' % indent, flags=re.DOTALL)
 			mod_all_re = indent + 'modifier ='
-			ascendancy_rare_tech_re = re.compile(mod_all_re+r' \{\s+factor = @ap_technological_ascendancy_rare_tech\s+(.+?)%s\}' % indent, flags=re.DOTALL)
-			mod_add_re = re.compile(mod_all_re+r' \{\s+(?:add|set) =')
+			mod_zero_re = re.compile(fr'({indent})modifier = {{( |\1)(\s*#[^\n]+\n)?\s*factor = 0(?:\.0+)?\s+(.+?)\2}}\n*?', flags=re.DOTALL)  # indent, space, comment, content
+			ascendancy_rare_tech_re = re.compile(mod_all_re + r'\s*\{\s*factor = @ap_technological_ascendancy_rare_tech\s+(.+?)%s\}' % indent, flags=re.DOTALL)
+			mod_add_re = re.compile(fr'(?:{indent2}|{mod_all_re} {{.*?)(?:add|set) =', re.DOTALL)
+			# mod_add_re = re.compile(r'(?:\n\t\t\t|\n\t\tmodifier = \{ [^\n]*?)(?:add|set) =')
 			mod_all_re = re.compile(mod_all_re)
-
 			insert_at = ascendancy_rare_tech_re.search(block)
 
 			if ACTUAL_STELLARIS_VERSION_FLOAT > 3.99 and insert_at:
@@ -3232,7 +3522,7 @@ def modfix(file_list, is_subfolder=False):
 				logger.info(f"Removed obsolete modifier: {insert_at.group(0)}") #  from '{block}' from '{match_parent}'
 				changed = True
 
-			mods_mergable = re.findall(mod_all_re, block)
+			mods_mergable = mod_all_re.findall(block)
 
 			if len(mods_mergable) < 2:
 				return match_parent
@@ -3258,9 +3548,12 @@ def modfix(file_list, is_subfolder=False):
 			def is_AND_block(m: re.Match) -> str:
 				# TODO Does not merge OR blocks
 				# indent = m.group(1)
-				parent_comment = m.group(2)
+				parent_comment = m.group(3)
 				comment_match = ""
-				m = m.group(3).strip().encode("utf-8").decode("unicode_escape")
+				m = m.group(4).strip().encode("utf-8").decode("unicode_escape")
+				if not m:
+					logger.warning(f"Find modifier content fail: '{m}'")
+					return m.group(0)
 				if m.startswith("#"):
 					comment_match = re.match(r'(#.*?\n)(.*)', m, flags=re.DOTALL)
 					if comment_match:
@@ -3297,24 +3590,26 @@ def modfix(file_list, is_subfolder=False):
 			insert_at = mod_all_re.search(block)
 			new_line_start = mod_zero_re.search(block).start()
 			new_content = mod_zero_re.sub("", block)
+			# print("mod_add_re.search", mod_add_re.search(new_content), new_content) # DEBUG
 
-			# print("cleaned block", new_content)
-			if mod_add_re.search(new_content):
-				# new_content = re.sub(r"\n+\t\}$", merged + '\n\t}', new_content, count=1)
-				# new_content = re.sub(r"\n*$", merged + '\n', new_content, count=1)
+			if mods_mergable or mod_add_re.search(new_content):
 				# Get the end of the last modifier block
 				insert_at = new_line_start
-				new_line_start = None
+				last_mod_end = None
 				for m in mod_re_block.finditer(new_content):
-					new_line_start = m
-				if new_line_start:
-					if new_line_start.end() > insert_at:
-						# print(f"Effect after modifier, index before: {insert_at}: after: {new_line_start.end()}")
-						insert_at = new_line_start.end()  # index just after '}'
+					last_mod_end = m
+				if last_mod_end:
+					last_mod_end = last_mod_end.end()
+					if last_mod_end > insert_at:
+						# print(f"Effect after modifier, index before: {insert_at}: after: {last_mod_end}") # DEBUG
+						insert_at = last_mod_end  # index just after '}'
 					elif not mods_mergable:
 						return match_parent
-				# print(f"Insert merged modifier *after any other modifier* because weight can also be added after:'\n{merged}'", )
+				else:
+					logger.warning(f"Find modifier end fail: '{new_content}' from'\n{block}'")
+				# print(f"Insert merged modifier *after any other modifier* because weight can also be added after:'\n{merged}'") # DEBUG
 				new_content = f"{new_content[:insert_at]}{merged}{new_content[insert_at:]}"
+				# print(f"new_content `{new_content}`") # DEBUG
 				insert_at = "end"
 			elif insert_at:
 				insert_at = insert_at.start()
@@ -3327,10 +3622,10 @@ def modfix(file_list, is_subfolder=False):
 						new_line_start = last_line.start(1)
 						last_line = last_line.group(1)
 						if last_line and re.match(r'^\s*#', last_line) is not None:
-							# print(f"The last line comment starts at index: {new_line_start} '{last_line}'")
+							# print(f"The last line comment starts at index: {new_line_start} '{last_line}'") # DEBUG
 							insert_at = new_line_start
 
-				# print(f"Insert merged modifier *before any other modifier*:'\n{merged}'")
+				# print(f"Insert merged modifier *before any other modifier*:'\n{merged}'") # DEBUG
 				new_content = f"{new_content[:insert_at]}{merged}{indent}{new_content[insert_at:].lstrip()}"
 				insert_at = "start"
 			else:
@@ -3373,23 +3668,19 @@ def modfix(file_list, is_subfolder=False):
 		else:
 			return (find_re_comm.sub(repl, text), changed)
 
-
 	def write_file():
-		structure = os.path.normpath(os.path.join(mod_outpath, subfolder))
-		out_file = os.path.normpath(os.path.join(structure, basename))
-		# print(f"\t# WRITE FILE:{out_file}{out}")
-		logger.info("\U0001F4BE WRITE FILE: %s" % os.path.normpath(os.path.join(subfolder, basename)))
-		if not os.path.exists(structure):
-			os.makedirs(structure)
+		structure = mod_outpath / subfolder
+		out_file = structure / basename
+		logger.info("\U0001F4BE WRITE FILE: %s" % (Path(subfolder) / basename))
+		if not structure.exists():
+			structure.mkdir(parents=True, exist_ok=True)
 			# print('Create folder:', subfolder)
-		open(out_file, "w", encoding="utf-8").write(out + '\n')
+		out_file.write_text(out.rstrip('\r\n') + '\n', encoding="utf-8")
 		txtfile.close()
-
 
 	def check_folder(folder):
 		# True means passed
 		rt = False
-		# logger.debug(f"subfolder: {subfolder}, {folder} {type(folder)}")
 		def is_valid_folder(folder):
 			nonlocal rt
 			if isinstance(folder, str):
@@ -3442,23 +3733,16 @@ def modfix(file_list, is_subfolder=False):
 	def format_indentation(lines: list[str]) -> tuple[list[str], list[str]]:
 		"""
 		Corrects the indentation of Stellaris code using tabs.
-		It processes the text line by line, adjusting indentation based on curly braces.
-
+		It processes the text line by line, adjusting indentation based on curly braces,
+		and returns the newly formatted lines along with structured information about
+		the code lines for further processing.
 		"""
 		nonlocal changed
-		# logger.info("Starting indentation correction...")
-		# lines = [l.replace('    ', '\t') for l in lines] # replace spaces with tabs
-
 		new_lines = []
-		stripped_lines = []
-		deleted_lines = 0
-		added_lines = 0 # for warning only
+		stripped_lines_info = []
 		indent_level = 0
-		blank_lines = 0 # targets4[r"(\t*?\n){3,6}"] = "\n\n" # cosmetic remove surplus lines
-		# For syntax fix debug
-		previous_line = ""
-		num_lines = 0
-		no_dbl_line = {
+		num_lines = 0 # For double line check
+		no_dbl_line = { # For double line check
 			"add_",
 			"create",
 			"spawn",
@@ -3470,164 +3754,431 @@ def modfix(file_list, is_subfolder=False):
 			'\"',
 			'remove_',
 			'ruin_',
-			# ' yes\n',
 		}
+		consecutive_blank_lines = 0
+		last_stripped_content = ''
 
 		for i, line in enumerate(lines):
 			stripped_line = line.strip()
 
-			# Skip blank lines, but keep at most one in a row
 			if not stripped_line:
-				if blank_lines < 1:
+				if consecutive_blank_lines < 1:
 					new_lines.append('')
-				else:
-					deleted_lines += 1
-					# changed = True
-				blank_lines += 1
+				consecutive_blank_lines += 1
 				continue
 
-			cmt = ""
-			if stripped_line == '}' and blank_lines > 0:
-				deleted_lines += 1
+			if stripped_line == '}' and consecutive_blank_lines > 0 and not comment:
 				content_part = stripped_line
-				# changed = True
-				del new_lines[-1] # targets4[r"^\t*?\n(\t+\})$"] = r"\1" # cosmetic remove surplus lines
-			else:
-				# Isolate content from comments for accurate brace counting
-				content_part = stripped_line.split('#', 1)
-				if len(content_part) > 1 and len(content_part[1]) > 0:
-					cmt = content_part[1]
-					content_part = content_part[0]
+				comment = ""
+				changed = True
+				# print("REMOVE SURPLUS LINE", new_lines[-1])
+				del new_lines[-1] # targets4[r"^\t*?\n(\t+\})$"] = r"\1" # cosmetic remove surplus line
+			else: # Isolate content from comments
+				comment = ""
+				parts = stripped_line.split('#', 1)
+				content_part = parts[0].rstrip()
+				if len(parts) > 1:
+					comment = parts[1].lstrip()
+				if not content_part: # Handle full-line comments
+					new_lines.append(line.rstrip())
+					consecutive_blank_lines = 0 # TODO Don't count the comment as empty line
+					continue
 
-					# We have a real separate comment
-					if len(content_part.rstrip()) > 0:
-						# No rstrip as we keep original space separator
-						if not content_part.endswith((' ', '\t')):
-							content_part += " " # Needs a space separator
-						if not cmt.startswith("#"):
-							# Cleanup superfluous comments (cosmetic)
-							if mod_time_re.search(stripped_line): # actually just a backfix
-								cmt = ""
-							elif not cmt.startswith((' ', '\t')):
-								cmt = "# " + cmt
-							else:
-								cmt = "#" + cmt
-						else:
-							cmt = "#" + cmt
-						stripped_line = f"{content_part}{cmt}"
-					else:
-						stripped_line = "#" + cmt
-				else:
-					content_part = content_part[0].rstrip()
-
-			blank_lines = 0
-
-			if len(content_part) == 0:
-				new_lines.append(line.rstrip())
-				continue
+			consecutive_blank_lines = 0
 
 			open_braces = content_part.count('{')
 			close_braces = content_part.count('}')
-			ind = 0 # current_indent_level
 
-			# Determine indentation for the current line.
-			# Adjust indent level before writing line if closing brace
-			if close_braces or open_braces:
-				if close_braces > open_braces:
-					indent_level -= (close_braces - open_braces)
-					if indent_level < 0: # Should never happen
-						logger.error(f"⚠ Mismatch BRACKET in line {i} on file {subfolder}/{basename}")
-						indent_level = 0
-						changed = False
-						break # We need a full break as we don't know the exact mismatch location.
-						return lines, []
-					# Handle wrong bracket nesting"else = { } }"
-					if content_part.endswith("}") and cmt == "" and not content_part.startswith("}"):
-						deleted_lines -= 1
-						added_lines += 1
-						ind = 1
-						stripped_line = '\t' * indent_level
-						stripped_line = f"{content_part[:-1].rstrip()}\n{stripped_line}}}"
-						changed = True
-				elif open_braces > close_braces: # Adjust indent level after writing line if opening brace
-					ind = (open_braces - close_braces)
-					indent_level += ind
-					ind *= -1
-				elif content_part.startswith("}"): # Handle something like "} else = {"
-					# Either create a new line, or reduce current_indent_level
-					ind = -1
+			current_indent = indent_level
 
-			ind = '\t' * (indent_level + ind)
-			line = f"{ind}{stripped_line}"
+			if close_braces > open_braces:
+				current_indent -= (close_braces - open_braces)
+			elif content_part.startswith("}"): # Handles `} else = {`
+				current_indent -= 1
 
-			# Warn/Skip double line
-			if (
-				# num_lines > 2 and
-				content_part == previous_line and
-				num_lines == stripped_lines[-1][0] and
-				not content_part.endswith('$') and
-				content_part != '}' and
-				content_part != '{' and
-				# content_part == stripped_line and # no comment
-				# lines == lines[i-1] fully identically # even same indention
-				not any(content_part.startswith(p) for p in no_dbl_line) and
-				not 'create_' in content_part
-				):
-				# TODO should be superfluous but it happens
-				if content_part == "has_owner = yes":
-					deleted_lines += 1
-					changed = True
-					continue
-				else:
-					logger.warning(f"Double line({num_lines}): {content_part} at {subfolder}/{basename}")
+			if current_indent < 0: current_indent = 0
 
+			indent_str = '\t' * current_indent
+
+			if code_cosmetic:
+				# Warn/Skip double line
+				if (
+					num_lines == len(new_lines) and
+					content_part == last_stripped_content and
+					content_part != '}' and
+					content_part != '{' and
+					not content_part.endswith('$') and
+					not 'reate_' in content_part
+					):
+					if content_part.startswith(("has_", "is_")):
+						changed = True # It's a cosmetic change
+						continue
+					elif not any(content_part.startswith(p) for p in no_dbl_line):
+						logger.warning(f"Double line({num_lines}): {content_part} at {subfolder}/{basename}")
+
+				# Cleanup superfluous comments (cosmetic)
+				# TODO: find a better solution? pretty wasteful here, actually just a backfix
+				if comment and comment[0].isdigit() and mod_time_re.search(stripped_line):
+					changed = True # It's a cosmetic change
+					logger.info(f"Removed comment '# {comment}' from content '{content_part}'!")
+					comment = ""
+
+			if comment and len(parts) > 1:
+				gap = parts[0][len(content_part):] or ""
+				comment = f"{gap}#{parts[1]}"
+			new_lines.append(f"{indent_str}{content_part}{comment}")
+			num_lines = len(new_lines)
+			# Store info for `valid_lines`
 			if len(content_part) > 8 or open_braces > 0 or close_braces > 0:
-				# i -= deleted_lines
-				previous_line = content_part
-				num_lines = i - deleted_lines
-				stripped_lines.append((num_lines, ind, content_part, cmt))
-			new_lines.append(line)
+				stripped_lines_info.append((num_lines - 1, indent_str, content_part, comment))
+			last_stripped_content = content_part
 
-		# logger.info(f"Indentation correction finished.")
-		if deleted_lines + added_lines != len(lines)-len(new_lines): # Should never happen
+			# Update indent level for the next line
+			indent_level = current_indent
+			if open_braces > close_braces:
+				indent_level += (open_braces - close_braces)
+
+		# Final check for mismatched braces
+		if indent_level != 0:
+			logger.error(f"⚠ Mismatch BRACKET in file {subfolder}/{basename} (final indent level: {indent_level}). Aborting formatting.")
+
+			# Construct defect file path
+			defect_filename = Path(basename).stem + '_defect.txt'
+			defect_filepath = mod_outpath / subfolder / defect_filename
+
+			# Write content to defect file
+			with open(defect_filepath, "w", encoding="utf-8") as f:
+				f.write("\n".join(new_lines))
+			logger.info(f"Defective output saved to: {defect_filepath}")
 			changed = False
-			logger.error(f"⚠ Mismatch LINES count at file {subfolder}/{basename} (virtual count {deleted_lines - added_lines} != {len(lines)-len(new_lines)}).")
+			lines = [l.rstrip('\r\n') for l in lines]
+			return lines, []
+			# sys.exit(1)
 
-		if len(new_lines) > 2 and new_lines[-1]: # and "inline_scripts" not in subfolder
-			# The last values from the loop (if there is just one empty line the vanilla parser gets crazy)
+		# Ensure there's a trailing newline if the file is not empty
+		if num_lines > 2 and new_lines[-1]:
+			# if there is just one empty line the vanilla parser gets crazy
 			line = lines[-1]
 			# print(f"last line sign'{lines[-1]}' ({len(lines)})")
 			if len(line) > 0 and line[-1] != '\n' and not line.startswith("#"): #  and line != new_lines[-1]
 				changed = True # More than cosmetic (adds automatically new line)
 				logger.debug(f"Added needed EOF to {subfolder}/{basename}.")
-			# if not re.search(r"^[\s#]", out): should be superfluous
-			#	 out = '\n' + out
-			#	 logger.debug(f"Added empty starting-line at file {subfolder}/{basename}.")
-			#	 changed = True
 
-		return new_lines, stripped_lines
+		return new_lines, stripped_lines_info
+	# --- End of `format_indentation` (placeholder) ---
+
+	def process_buildings(lines: List[str], changed: bool) -> Tuple[List[str], bool]:
+		"""
+		Scans 'common/buildings' files, ensures 'allow = { ... }' blocks exist
+		for each top-level building, and adds 'is_occupied_flag = no' if not present.
+		It also removes 'always = yes' if found inside an 'allow' block.
+		"""
+
+		logger.info(f"Scanning for buildings in: {basename}")
+
+		def find_building_blocks(lines: List[str]) -> List[Tuple[str, int, int]]:
+			"""
+			Finds all top-level building blocks and returns a list of tuples,
+			each containing the building key, start index, and end index.
+			"""
+			blocks = []
+			depth = 0
+			start_idx = -1
+			for i, line in enumerate(lines):
+				content_part = line.split('#')[0].strip()
+				if not content_part:
+					continue
+
+				# Check for top-level building start
+				if depth == 0:
+					if '=' in line and content_part.endswith('{'):
+						# Heuristic: Check if it looks like a building definition
+						if not line.startswith('\t'): # Assuming top level is not indented
+							start_idx = i
+							depth = 1
+							continue
+
+				if depth > 0:
+					depth += content_part.count('{')
+					depth -= content_part.count('}')
+					if depth == 0 and start_idx != -1:
+						building_key = lines[start_idx].split('=', 1)[0].strip()
+						blocks.append((building_key, start_idx, i))
+						start_idx = -1
+			return blocks
+
+		def find_block_end_line(lines: List[str], start_line: int) -> int:
+			"""Finds the end line of a block starting at a specific line."""
+			depth = 0
+			for i in range(start_line, len(lines)):
+				line = lines[i].split('#')[0]
+				depth += line.count('{')
+				depth -= line.count('}')
+				if depth == 0:
+					return i
+			return -1 # Should not happen in a well-formed file
+
+		def find_block_lines(lines: List[str], block_name: str, search_range: Tuple[int, int], find_last: bool = False) -> Tuple[int, int]:
+			"""
+			Finds the start and end line indices of a named block (e.g., 'allow')
+			within the search range. Returns (-1, -1) if not found.
+			Only matches blocks at depth 1 relative to the search range start.
+			"""
+			match_candidate = (-1, -1)
+			depth = 0
+
+			for i in range(search_range[0], search_range[1] + 1):
+				line = lines[i]
+				line_content = line.split('#')[0].strip()
+
+				opens = line_content.count('{')
+				closes = line_content.count('}')
+
+				if i == search_range[0]:
+					depth += opens
+					depth -= closes
+					continue
+
+				if not line_content:
+					continue
+
+				if depth == 1:
+					if line_content.startswith(block_name) and line_content.split('=', 1)[0].strip() == block_name and '{' in line_content:
+						end_line = find_block_end_line(lines, i)
+						if end_line != -1:
+							match_candidate = (i, end_line)
+							if not find_last:
+								return match_candidate
+
+				depth += opens
+				depth -= closes
+
+			return match_candidate
+
+		def reorder_allow_block(lines: List[str]) -> List[str]:
+			"""
+			Reorders 'allow = { ... }' blocks within building definitions to a canonical position.
+			"""
+			nonlocal file_changed
+			for building_key, building_start, building_end in reversed(find_building_blocks(lines)):
+				search_range = (building_start, building_end)
+
+				allow_start, allow_end = find_block_lines(lines, "allow", search_range)
+				if allow_start == -1:
+					continue
+
+				allow_block_lines = lines[allow_start : allow_end + 1]
+
+				# Find the last occurrence of 'potential' or 'convert_to'
+				insert_after_line = -1
+				for anchor in ["potential", "convert_to"]:
+					_, anchor_end = find_block_lines(lines, anchor, search_range, find_last=True)
+					if anchor_end > insert_after_line:
+						insert_after_line = anchor_end
+
+				# Find the first occurrence of 'prerequisites' or 'destroy_trigger'
+				insert_before_line = building_end + 1
+				for anchor in ["prerequisites", "destroy_trigger"]:
+					anchor_start, _ = find_block_lines(lines, anchor, search_range)
+					if anchor_start != -1:
+						insert_before_line = min(insert_before_line, anchor_start)
+
+				# Determine the final insertion point
+				if insert_after_line != -1:
+					insertion_line = insert_after_line + 1
+				elif insert_before_line <= building_end:
+					insertion_line = insert_before_line
+				else:
+					continue
+
+				# If the block is already in the correct place, do nothing.
+				if insertion_line == allow_start or insertion_line == allow_start + 1:
+					continue
+
+				# Move the block
+				if insertion_line > allow_start:
+					insertion_line -= len(allow_block_lines)
+
+				del lines[allow_start : allow_end + 1]
+				lines[insertion_line:insertion_line] = allow_block_lines
+
+				if not file_changed:
+					file_changed = True
+					logger.info(f"Reordered 'allow' block for '{building_key}' in {basename}")
+			return lines
+
+		file_changed = False
+		indent = '\t\t'
+		single_planet_re = re.compile(r'planet = \{ *(.*?) *\}$')
+
+		# 1. Pre-process: Replacements
+		for i, line in enumerate(lines):
+			if "is_regular_empire = no" in line:
+				lines[i] = line.replace("is_regular_empire = no", "is_gestalt = yes")
+				file_changed = True
+			elif "planet_owner" in line:
+				lines[i] = line.replace("planet_owner", "owner")
+				file_changed = True
+			elif "exists = owner" in line:
+				# Use regex to avoid replacing 'exists = owner.overlord'
+				# Negative lookahead (?![.\w]) ensures 'owner' is not followed by dot or word char
+				new_line = re.sub(r'(?<![\w.])exists = owner(?![.\w])', 'has_owner = yes', line)
+				if new_line != line:
+					lines[i] = new_line
+					file_changed = True
+
+		# Remove planet = { ... } scoping
+		for building_key, start, end in reversed(find_building_blocks(lines)):
+			for i in range(end - 1, start, -1):
+				if i >= len(lines): continue
+				line = lines[i]
+				stripped_line = line.strip()
+				if stripped_line.startswith("planet = {"):
+					planet_block_start = i
+					planet_block_indent = line.split("planet", 1)[0]
+					planet_block_end = find_block_end_line(lines, planet_block_start)
+
+					if planet_block_end != -1:
+						if planet_block_start == planet_block_end:
+							single_line_content = single_planet_re.search(stripped_line)
+							if single_line_content:
+								dedented_content = [planet_block_indent + single_line_content.group(1) + '\n']
+								del lines[planet_block_start : planet_block_end+1]
+								lines[planet_block_start:planet_block_start] = dedented_content
+								file_changed = True
+						else:
+							dedented_content = lines[planet_block_start+1:planet_block_end]
+							dedented_content = [l.replace(planet_block_indent + '\t', planet_block_indent, 1) for l in dedented_content]
+							del lines[planet_block_start : planet_block_end+1]
+							lines[planet_block_start:planet_block_start] = dedented_content
+							file_changed = True
+
+		# 2. Main Processing: Allow Blocks and Flags
+		for building_key, start, end in reversed(find_building_blocks(lines)):
+
+			allow_block_range = None
+			misplaced_flag_lines = []
+			flag_in_allow = False
+			current_depth = 1
+
+			# Robust search for allow block and flags
+			scan_idx = start + 1
+			while scan_idx < end:
+				line = lines[scan_idx]
+				clean_line = line.split('#')[0].strip()
+
+				if not clean_line:
+					scan_idx += 1
+					continue
+
+				# Check for allow block at depth 1
+				if current_depth == 1 and clean_line.startswith('allow') and clean_line.split('=',1)[0].strip() == 'allow' and '{' in clean_line:
+					blk_end = find_block_end_line(lines, scan_idx)
+					allow_block_range = (scan_idx, blk_end)
+
+					# Check for flag inside allow
+					for k in range(scan_idx, blk_end + 1):
+						if 'is_occupied_flag' in lines[k]: # Check for any value
+							flag_in_allow = True
+
+					scan_idx = blk_end + 1
+					continue
+
+				if current_depth == 1 and 'is_occupied_flag' in clean_line: # Check for any value
+					misplaced_flag_lines.append(scan_idx)
+
+				current_depth += clean_line.count('{')
+				current_depth -= clean_line.count('}')
+				scan_idx += 1
+
+			if allow_block_range:
+				allow_start, allow_end = allow_block_range
+				lines_removed_before_allow = 0
+
+				for flag_idx in reversed(misplaced_flag_lines):
+					del lines[flag_idx]
+					if flag_idx < allow_start:
+						lines_removed_before_allow += 1
+					file_changed = True
+					logger.info(f"Removed misplaced 'is_occupied_flag' from root of {building_key}")
+
+				allow_start -= lines_removed_before_allow
+				allow_end -= lines_removed_before_allow
+
+				if not flag_in_allow:
+					if allow_start == allow_end:
+						# Expand one-liner
+						content = lines[allow_start].strip()
+						match = re.search(r'allow = \{(.*)\}', content)
+						inner = match.group(1).strip() if match else ""
+						new_lines_list = [
+							f'\tallow = {{\n',
+							f'\t\tis_occupied_flag = no\n',
+							f'\t\t{inner}\n' if inner else '',
+							f'\t}}\n'
+						]
+						lines[allow_start:allow_start+1] = new_lines_list
+						file_changed = True
+						logger.info(f"Expanded allow block and added is_occupied_flag in {building_key}")
+					else:
+						# Insert into multi-line
+						inserted = False
+						for k in range(allow_start + 1, allow_end):
+							if 'always = yes' in lines[k]:
+								lines[k] = lines[k].replace('always = yes', 'is_occupied_flag = no')
+								inserted = True
+								file_changed = True
+								break
+						if not inserted:
+							lines.insert(allow_start + 1, f'\t\tis_occupied_flag = no\n')
+							file_changed = True
+							logger.info(f"Added is_occupied_flag to allow block in {building_key}")
+
+			else:
+				# No allow block
+				for flag_idx in reversed(misplaced_flag_lines):
+					del lines[flag_idx]
+					file_changed = True
+					logger.info(f"Removed misplaced 'is_occupied_flag' from root of {building_key}")
+
+				# Adjust end index
+				current_end = end - len(misplaced_flag_lines)
+				new_block = [
+					f'\n',
+					f'\tallow = {{\n',
+					f'\t\tis_occupied_flag = no\n',
+					f'\t}}\n'
+				]
+				lines[current_end:current_end] = new_block
+				file_changed = True
+				logger.info(f"Created allow block with is_occupied_flag in {building_key}")
+
+		if file_changed:
+			lines = reorder_allow_block(lines)
+			return lines, True
+		else:
+			return lines, changed
 
 	for _file in file_list:
-		_file = os.path.normpath(_file)
+		_file = Path(_file)
 		if (
-			not any(_file.startswith(p) for p in exclude_paths)
-			and not any(f in _file for f in exclude_files)
-			and _file.endswith(".txt")
-			and os.path.isfile(_file)
+			not any(str(_file).startswith(str(p)) for p in exclude_paths)
+			and not any(f in _file.name for f in exclude_files)
+			and _file.suffix == ".txt"
+			and _file.is_file()
 		):
 			lines = ""
 			logger.debug(f"Check file: {_file}")
-			with open(_file, "r", encoding="utf-8", errors="ignore") as txtfile:
-
-				fullpath = os.path.relpath(_file, mod_path).replace("\\", "/")
-				subfolder, basename = os.path.split(fullpath)
-				# print(f"subfolder: '{subfolder}', basename: '{basename}'")
-				# out = ""
+			with _file.open("r", encoding="utf-8", errors="ignore") as txtfile:
+				fullpath = _file.relative_to(mod_path).as_posix()
+				subfolder = Path(fullpath).parent.as_posix()
+				basename = Path(fullpath).name
 				changed = False
-
 				lines = txtfile.readlines()
-				# if code_cosmetic:
-					# do_code_cosmetic(lines)
+				# Add allow block to each building
+				if subfolder.startswith("common/buildings"):
+					lines, changed = process_buildings(lines, changed)
+
 				lines, valid_lines = format_indentation(lines)
 
 				# Since v4.0
@@ -3681,6 +4232,7 @@ def modfix(file_list, is_subfolder=False):
 								if rt > 0:
 									line_changed = f"{stripped[:m.start()]}{line_changed}{stripped[m.end():]}"
 									if line_changed != stripped:
+										# print(f"LINE COMPARE: {lines[i]}=={stripped} after:\n{line_changed}")
 										lines[i] = f"{ind}{line_changed}{cmt}"
 										valid_lines[l] = (i, ind, line_changed, cmt)
 										changed = True
@@ -3712,12 +4264,12 @@ def modfix(file_list, is_subfolder=False):
 								break # just one hit per file
 
 				out = "\n".join(lines)
-				if code_cosmetic and subfolder.endswith(WEIGHT_FOLDERS):
+				if code_cosmetic and any(wf in subfolder for wf in WEIGHT_FOLDERS):
 					out, changed = merge_factor0_modifiers(out, changed)
 
 				if changed:
 					lines = out.splitlines() # Theoretically we could take the previous lines, but they are possible affected by additional LB
-				
+
 				need_clean_code = True
 
 				for pattern, repl in tar4:  # new list way
@@ -3806,18 +4358,35 @@ def modfix(file_list, is_subfolder=False):
 
 						if debug_mode:
 							# Doublecheck workaround for unsafe check
-							logger.info(f"pattern replacement end {pattern.pattern}")
+							logger.debug(f"Replacement end {pattern.pattern}")
 							if not need_clean_code:
 								lines_len_before = len(lines)
-								lines_len_after = cleaned_code.count('\n') + 1 
+								lines_len_after = cleaned_code.count('\n') + 1
 								if lines_len_after != lines_len_before:
 									need_clean_code = True
 									logger.warning(f"⚠ Mismatch lines at {basename}\nbefore {lines_len_before} != {lines_len_after} after" )
 
-				out = '\n'.join(lines) # Final result
+				# [Existing Line] Final result
+				out = '\n'.join(lines)
 
-				if changed and not only_warning:
-					write_file()
+				if not only_warning:
+					# --- START OPTIMIZATION ---
+					if code_cosmetic:
+						# Check if we are in a relevant folder to avoid parsing unnecessary files
+						#  subfolder != "common/scripted_effects" and   or subfolder.endswith(("bombardment_stances", "living_standards", "storm_types"))
+						if subfolder in EFFECT_FOLDERS or subfolder.endswith(("resolutions", "starbase_types", "diplomatic_actions", "living_standards", "game_rules", "scripted_triggers")):
+							# Call the external optimizer
+							optimized_content, logic_changed = logic_optimizer.process_text(out)
+							if logic_changed or full_code_cosmetic:
+								out = optimized_content
+								changed = True # Set your main script's changed flag
+								logger.info(f"\t[Logic] Optimized nested logic blocks in {basename}")
+							# changed = True # DEBUG
+
+					if changed:
+						write_file()
+					else:
+						txtfile.close()
 				else:
 					txtfile.close()
 
@@ -3825,9 +4394,9 @@ def modfix(file_list, is_subfolder=False):
 	logger.info(f"✔ Script completed in {(time.perf_counter() - start_time):.3f} s")
 
 	## Update mod descriptor
-	_file = os.path.join(mod_path, "descriptor.mod")
-	if not only_warning and os.path.exists(_file):
-		with open(_file, "r", encoding="utf-8", errors="ignore") as descriptor_mod:
+	_file = mod_path / "descriptor.mod"
+	if not only_warning and _file.exists():
+		with _file.open("r", encoding="utf-8", errors="ignore") as descriptor_mod: # , newline='\n' Py 3.10+ only
 			# out = descriptor_mod.readlines()
 			out = descriptor_mod.read()
 			main_ver_len = FULL_STELLARIS_VERSION.rfind(".")
@@ -3904,7 +4473,7 @@ def modfix(file_list, is_subfolder=False):
 				# FULL_STELLARIS_VERSION = re.compile(r'supported_version=\"v')
 				if not re.search('supported_version="v', out):
 					out = out.replace('supported_version="', 'supported_version="v', 1)
-				open(_file, "w", encoding="utf-8", errors="ignore").write(out.strip())
+				_file.write_text(out.strip(), encoding="utf-8") # , newline='\n' Py 3.10+ only
 
 	# print("\n# Done!", mod_outpath, file=log_file)
 	logger.info("✔ Done! %s" % mod_outpath)
@@ -3918,13 +4487,10 @@ class SafeFormatter(logging.Formatter):
 if __name__ == "__main__":
 	# Configure basic logging - this can be overridden by argparse later
 	# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-	logger = logging.getLogger(__name__)
-	logger.setLevel(logging.DEBUG)	   # Ensure all levels pass through
-	logger.propagate = False			 # Prevent double logging
 
 	args = parse_arguments()
-
 	if args.mod_path: mod_path = args.mod_path
+	if args.mod_outpath: mod_outpath = args.mod_outpath
 	if args.only_warning: only_warning = args.only_warning
 	if args.only_actual: only_actual = args.only_actual
 	if args.code_cosmetic: code_cosmetic = args.code_cosmetic
@@ -3942,19 +4508,16 @@ if __name__ == "__main__":
 	setBoolean(keep_default_country_trigger)
 
 	if mod_path and mod_path != "":
-		mod_path = os.path.normpath(mod_path)
+		mod_path = Path(mod_path).resolve()
 	if (
 		mod_path is None
-		or mod_path == ""
-		or not os.path.exists(mod_path)
-		or not os.path.isdir(mod_path)
+		or not str(mod_path)
+		or not mod_path.exists()
+		or not mod_path.is_dir()
 		):
-		if os.path.exists(
-			os.path.expanduser("~") + "/Documents/Paradox Interactive/Stellaris/mod"
-		):
-			mod_path = (
-				os.path.expanduser("~") + "/Documents/Paradox Interactive/Stellaris/mod"
-			)
+		stellaris_mod_path = Path.home() / "Documents" / "Paradox Interactive" / "Stellaris" / "mod"
+		if stellaris_mod_path.exists():
+			mod_path = stellaris_mod_path
 		else:
 			CSIDL_PERSONAL = 5
 			SHGFP_TYPE_CURRENT = 0
@@ -3962,7 +4525,7 @@ if __name__ == "__main__":
 			ctypes.windll.shell32.SHGetFolderPathW(
 				None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, temp
 			)
-			mod_path = temp.value + "/Paradox Interactive/Stellaris/mod"
+			mod_path = Path(temp.value) / "Paradox Interactive" / "Stellaris" / "mod"
 
 	start_time = 0
 	# exit()
@@ -4061,15 +4624,15 @@ if __name__ == "__main__":
 	targets4 = [(re.compile(k, flags=re.I|re.M), v) for k, v in targets4.items()]
 
 	### General Fixes (needs to be last)
-	items_to_add = [
-		(re.compile(r"\bNO[RT] = \{\s+(\w+ = )yes\s+\}", flags=re.I), r"\1no"), # RESOLVE NOT with one item
-		 # REMOVE OR/AND with one item
-		(re.compile(r"((\s+)(?:OR|AND|this) = \{\s+(\w+ = (?:[^{}#\s]+?|\{[^{}#]+?\s*\}))\s+\})", flags=re.I),
-		# (re.compile(r"((\n\t+)(?:OR|AND|this) = \{(?: |\2\t)(\w+ = (?:[^{}#\s]+?|\{\2\t\t[^{}#]+?\2\t\}))(?: |\2)\})", flags=re.I),
-			lambda p: f"{p.group(2)}{dedent_block(p.group(3))}")
-	]
-	# targets4[:0] = items_to_add
-	targets4.extend(items_to_add)
+	# items_to_add = [
+	# 	(re.compile(r"\bNO[RT] = \{\s+(\w+ = )yes\s+\}", flags=re.I), r"\1no"), # RESOLVE NOT with one item
+	# 	 # REMOVE OR/AND with one item
+	# 	(re.compile(r"((\s+)(?:OR|AND|this) = \{\s+(\w+ = (?:[^{}#\s]+?|\{[^{}#]+?\s*\}))\s+\})", flags=re.I),
+	# 	# (re.compile(r"((\n\t+)(?:OR|AND|this) = \{(?: |\2\t)(\w+ = (?:[^{}#\s]+?|\{\2\t\t[^{}#]+?\2\t\}))(?: |\2)\})", flags=re.I),
+	# 		lambda p: f"{p.group(2)}{dedent_block(p.group(3))}")
+	# ]
+	# # targets4[:0] = items_to_add
+	# targets4.extend(items_to_add) # TODO port this to the
 
 	# targetsR = [(re.compile(k[0], flags=0), k[1]) for k in targetsR]
 	for i, item in enumerate(targetsR):
@@ -4087,16 +4650,11 @@ if __name__ == "__main__":
 		#	 print(f"Error compiling regex '{pattern_string}': {e}")
 		targetsR[i] = [re.compile(pattern_string), msg]
 
-	# print("\nCompiled targetsR:")
-	# for item in targetsR:
-	#	 print(item)
+	parse_dir()
 
-	parse_dir()  # mod_path, mod_outpath
-	# input("\nPRESS ANY KEY TO EXIT!")
-		# Close the log file
-	# if hasattr(log_file, 'close') and callable(getattr(log_file, 'close')) and not hasattr(log_file, 'closed') and not log_file.closed:
-	#	 log_file.close()
-	# if debug_mode:
+	if code_cosmetic and not only_warning and full_code_cosmetic:
+		check_civics.check_civic_conflicts(mod_path)
+
 	if regex_times:
 		regex_times = sorted(regex_times.items(), key=lambda kv: kv[1], reverse=True)[:7]
 		print(f"\n=== Regex Timing Summary (Top {len(regex_times)}) ===") # Find possible Catastrophic Backtracking
