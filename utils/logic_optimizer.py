@@ -52,8 +52,9 @@ negated_ops = {'>': '<=', '<': '>=', '>=': '<', '<=': '>', '!=': '=', '=': '!='}
 triggerScopes = r"leader|owner|controller|overlord|space_owner|(?:prev){1,4}|(?:from){1,4}|root|this|event_target:[\w@]+|owner_or_space_owner"
 SCOPES = triggerScopes + r"|design|megastructure|planet|ship|pop_group|fleet|cosmic_storm|capital_scope|sector_capital|capital_star|system_star|solar_system|star|orbit|army|ambient_object|species|owner_species|owner_main_species|founder_species|bypass|pop_faction|war|federation|starbase|deposit|sector|archaeological_site|first_contact|spy_network|espionage_operation|espionage_asset|agreement|situation|astral_rift"
 # 'switch' gets handled hybrid; can't contain trigger nodes like 'calc_true_if'
-RAW_BLOCKS = ('in_breach_of', 'inverted_switch')
-
+RAW_BLOCKS = ('in_breach_of', '')
+HYBRID_RAW_BLOCKS = ('switch', 'inverted_switch') # , 'random_list' TODO
+RAW_BLOCKS = RAW_BLOCKS + HYBRID_RAW_BLOCKS
 
 KEYWORDS_TO_LOWER_START = (
 	'ROOT.', 'PREV.', 'FROM.', 'OWNER.', 'CONTROLLER.'
@@ -79,13 +80,13 @@ KEYWORDS_TO_UPPER.add('AND')
 NON_NEGATABLE_SCOPES = ( 'if', 'else_if', 'else', 'while', 'switch', 'inverted_switch', 'calc_true_if' ) # , 'trigger', 'limit'
 # NO_TRIGGER_VAL = {'add', 'factor', 'mult', 'multiply', 'base', 'weight'}
 
-SAFE_MERGE_PARENTS = {
-	'AND', 'NAND', 'NOT',
-	'trigger', 'limit', 'potential', 'allow', 'pre_triggers',
-	'if', 'else_if', 'else', 'while',
-	'effect', 'immediate', 'init_effect',
-	'modifier', 'ai_weight', 'weight_modifier'
-}
+# SAFE_MERGE_PARENTS = {
+# 	'AND', 'NAND', 'NOT',
+# 	'trigger', 'limit', 'potential', 'allow', 'pre_triggers',
+# 	'if', 'else_if', 'else', 'while',
+# 	'effect', 'immediate', 'init_effect',
+# 	'modifier', 'ai_weight', 'weight_modifier'
+# }
 
 SCOPES_RE = re.compile(f"^(?:{SCOPES})$")
 
@@ -257,7 +258,7 @@ def parse(tokens, text):
 				parent_node = current_list[-1]
 				parent_node['val'] = finished_list
 				# Capture raw text for switch nodes to allow length comparison later
-				if parent_node.get('key') == 'switch' and '_token_start' in parent_node:
+				if parent_node.get('key') in HYBRID_RAW_BLOCKS and '_token_start' in parent_node:
 					parent_node['_raw'] = text[parent_node['_token_start']:token['end']]
 
 				cm, offset = get_inline_comment_and_offset(i, token_line)
@@ -752,7 +753,7 @@ def optimize_node_list(node_list, parent_key=None):
 				if key == 'AND':
 					can_merge = True
 				elif SCOPES_RE.match(key):
-					if key == 'planet' and parent_key not in SAFE_MERGE_PARENTS:
+					if key == 'planet' and not parent_key: # not in SAFE_MERGE_PARENTS
 						can_merge = False
 					else:
 						can_merge = True
@@ -1857,7 +1858,7 @@ def node_to_string(node, depth=0, be_compact=False):
 		lines.append(f"{indent}}}{cm_close}")
 		formatted_str = "\n".join(lines)
 
-		if node.get('_raw') and node.get('key') == 'switch':
+		if node.get('_raw') and node.get('key') in HYBRID_RAW_BLOCKS:
 			raw_val = node['_raw']
 			# Simple line count check
 			if raw_val.count('\n') < formatted_str.count('\n'):
@@ -1932,8 +1933,8 @@ def block_to_string(block_list):
 # --- 9. Main ---
 def process_text(content):
 	try:
-		original_content = content
 		content = content.replace('\r\n', '\n')
+		original_content = content
 		tokens = tokenize(content)
 		tree = parse(tokens, content)
 

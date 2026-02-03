@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2026/01/23@mod
+# @Revision: 2026/02/03@mod
 # If you find this tool helpful, consider supporting development:
 # 	Buy me a coffee on Ko-fi https://ko-fi.com/f1r3pr1nc3
 # 	Donate via PayPal https://www.paypal.me/supportfireprinc
@@ -29,8 +29,8 @@ from collections import defaultdict
 from typing import List, Tuple
 from pathlib import Path # Replaced os and glob with pathlib
 # my sub-module
-import logic_optimizer
-import check_civics
+from utils import logic_optimizer
+from utils import check_civics
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)	   # Ensure all levels pass through
@@ -222,6 +222,32 @@ def flatten_and_comment(match: re.Match) -> str:
 	match = re.sub(r'\s+', ' ', match.strip())
 	return f"{indent}# {match}"
 
+
+# TODO
+# every_system_within_border = \{\n?\s+limit = \{\s+exists = starbase
+# any_system_colony = {
+# 	has_owner = yes
+# 	owner = {
+# 		NOT = { is_same_empire = event_target:swarm }
+# 	}
+# }
+
+v4_3 = {
+}
+
+revert_v4_3 = {
+	"targetsR": [
+		[r"\bcivic_entropy_drinkers_psionic_modifier\b", "Civic MERGED from machine and hive_mind version in v4.3"],
+	],
+	"targets3": {
+		r"\bis_psionic_aura_suppressed =": (("T", "is_psionic_aura_suppressed"), r"check_aura_suppressors ="),
+		r"@fe_sr_cost_1\b": "@fe_sr_cost",
+		# r"\bcivic_entropy_drinkers_psionic_modifier\b": "civic_entropy_drinkers_hive_mind_modifier", # TODO machine
+		r"\btr_cybernetics_assimilator_augmentation_centers\b": "tr_cybernetics_assimilator_gestation",
+	},
+	"targets4": {
+	},
+}
 
 # 4.2 'Corvus' (Infernals DLC)
 # Added prevent_automatic_genocidal_hostilities = yes in country def
@@ -1624,6 +1650,7 @@ version_data_sources = [
 	(3.0,  v3_0),
 ]
 revert_version_data_sources = [
+	(4.3, revert_v4_3),
 	(4.2, revert_v4_2),
 	(4.1, revert_v4_1),
 	(4.0, revert_v4_0),
@@ -2286,6 +2313,7 @@ def add_code_cosmetic():
 		r"^(\s+has_deposit_for = \S+)\n(\t+(?:has_deposit|has_\w+_station) = (?:yes|no))$": (["events", "common/anomalies", "common/scripted_effects", "common/inline_scripts", "common/patrons/psionic_auras"], r"\2\n\1"), # r"\1OR = {\3\2\n\1}"
 		# Replace `exists = owner` with `has_owner = yes` inside planet_event trigger blocks.
 		r"(?s)^planet_event = \{.+?^\}$": [r"(\n\ttrigger = \{[^{}]*?)exists = owner\b", ("events", r"\1has_owner = yes")],
+		# Replace pop_group with species scope
 		r"((\n\t+)any_owned_pop_group = \{([^\n{}]*|[\s\S]*?\2)\})$": [
 			r'(\s+)any_owned_pop_group( = \{(?:(\s+)(?:NOT|NOR|OR) = \{)?(?:\s+(?:(?:pop_group_)?has_trait = [\"\w]+|(?:is_(?:enslaved|sapient|psionic_species|scope_valid|robot_pop_group|robotic_species|subspecies)|has_(?:auto_modding|unplugged_positive|unplugged_negative|interesting_species)_trait) = (?:yes|no)|is_same_species = [\w:.]+)){1,5}(?(3)(\3| )\})(\1| )\})',
 			lambda m: (
@@ -2294,8 +2322,8 @@ def add_code_cosmetic():
 				m.group(2)
 					.replace('is_robot_pop_group', 'is_robotic')
 					.replace('is_robotic_species', 'is_robotic')
-					.replace('pop_group_has_trait', 'has_trait')	
-			)	
+					.replace('pop_group_has_trait', 'has_trait')
+			)
 		], # TODO
 		# r"^(\s*)NO[RT] = \{([\s\S]*?)\n\1\}\s*^\1([\w\._]+)\s*([<>]=?)\s*([\d\._@\w]+)\s*^\1NO[RT] = \{([\s\S]*?)^\1\}": _merge_not_nor_blocks,
 		r"(?:(\s+)(?:is_planet_class = pc_(?:frozen|ice_asteroid)|is_inside_nebula = yes)){3}": (("T", "can_have_exotic_gases_deposits"), r"\1can_have_exotic_gases_deposits = yes"),
@@ -3499,8 +3527,8 @@ def modfix(file_list, is_subfolder=False):
 
 		def repl(match_parent):
 			nonlocal changed
-			block = match_parent.group(2)
-			if not block:
+			block_content = match_parent.group(2)
+			if not block_content:
 				return match_parent
 
 			indent = indent2 = "\n\t" + match_parent.group(1)
@@ -3514,20 +3542,20 @@ def modfix(file_list, is_subfolder=False):
 			mod_add_re = re.compile(fr'(?:{indent2}|{mod_all_re} {{.*?)(?:add|set) =', re.DOTALL)
 			# mod_add_re = re.compile(r'(?:\n\t\t\t|\n\t\tmodifier = \{ [^\n]*?)(?:add|set) =')
 			mod_all_re = re.compile(mod_all_re)
-			insert_at = ascendancy_rare_tech_re.search(block)
+			insert_at = ascendancy_rare_tech_re.search(block_content)
 
 			if ACTUAL_STELLARIS_VERSION_FLOAT > 3.99 and insert_at:
-				block = block[:insert_at.start()] + block[insert_at.end():]
-				match_parent = match_parent[:block_coords[0]] + block + match_parent[block_coords[1]:]
-				logger.info(f"Removed obsolete modifier: {insert_at.group(0)}") #  from '{block}' from '{match_parent}'
+				block_content = block_content[:insert_at.start()] + block_content[insert_at.end():]
+				match_parent = match_parent[:block_coords[0]] + block_content + match_parent[block_coords[1]:]
+				logger.info(f"Removed obsolete modifier: {insert_at.group(0)}") #  from '{block_content}' from '{match_parent}'
 				changed = True
 
-			mods_mergable = mod_all_re.findall(block)
+			mods_mergable = mod_all_re.findall(block_content)
 
 			if len(mods_mergable) < 2:
 				return match_parent
 
-			mods = mod_zero_re.finditer(block) # findall(block)
+			mods = mod_zero_re.finditer(block_content) # findall(block_content)
 			mods_mergable = False
 			merged = []
 			try:
@@ -3587,13 +3615,13 @@ def modfix(file_list, is_subfolder=False):
 				logger.debug(f"MERGED {merged}")
 
 			# Replace all original modifier = { ... } with merged version
-			insert_at = mod_all_re.search(block)
-			new_line_start = mod_zero_re.search(block).start()
-			new_content = mod_zero_re.sub("", block)
+			insert_at = mod_all_re.search(block_content)
+			new_line_start = mod_zero_re.search(block_content).start()
+			new_content = mod_zero_re.sub("", block_content)
 			# print("mod_add_re.search", mod_add_re.search(new_content), new_content) # DEBUG
 
 			if mods_mergable or mod_add_re.search(new_content):
-				# Get the end of the last modifier block
+				# Get the end of the last modifier block_content
 				insert_at = new_line_start
 				last_mod_end = None
 				for m in mod_re_block.finditer(new_content):
@@ -3606,7 +3634,7 @@ def modfix(file_list, is_subfolder=False):
 					elif not mods_mergable:
 						return match_parent
 				else:
-					logger.warning(f"Find modifier end fail: '{new_content}' from'\n{block}'")
+					logger.warning(f"Find modifier end fail: '{new_content}' from'\n{block_content}'")
 				# print(f"Insert merged modifier *after any other modifier* because weight can also be added after:'\n{merged}'") # DEBUG
 				new_content = f"{new_content[:insert_at]}{merged}{new_content[insert_at:]}"
 				# print(f"new_content `{new_content}`") # DEBUG
@@ -3629,17 +3657,17 @@ def modfix(file_list, is_subfolder=False):
 				new_content = f"{new_content[:insert_at]}{merged}{indent}{new_content[insert_at:].lstrip()}"
 				insert_at = "start"
 			else:
-				logger.warning(f"Check, there seems something off in '{new_content}' from'\n{block}'")
+				logger.warning(f"Check, there seems something off in '{new_content}' from'\n{block_content}'")
 				return match_parent
 
 			if mods_mergable:
 				changed = True
 				logger.info(f"Merged multiple factor 0 modifier and moved to the {insert_at}: {merged}")
-			elif block != new_content:
+			elif block_content != new_content:
 				changed = True
 				logger.info(f"Moved factor 0 modifier to the {insert_at}: {merged}")
-			elif re.search(r"(d_deep_sinkhole|d_toxic_kelp|d_massive_glacier|d_noxious_swamp|d_quicksand_basin|d_dense_jungle)", new_content) and len(mod_all_re.findall(block)) == 2:
-				logger.debug(f"BLIND MATCH at {insert_at} in '{block}' with {len(mod_zero_re.findall(match_parent))}")
+			elif re.search(r"(d_deep_sinkhole|d_toxic_kelp|d_massive_glacier|d_noxious_swamp|d_quicksand_basin|d_dense_jungle)", new_content) and len(mod_all_re.findall(block_content)) == 2:
+				logger.debug(f"BLIND MATCH at {insert_at} in '{block_content}' with {len(mod_zero_re.findall(match_parent))}")
 			return match_parent[:block_coords[0]] + new_content + match_parent[block_coords[1]:]
 
 		# Apply recursively to all scopes that might contain modifiers
@@ -3754,6 +3782,8 @@ def modfix(file_list, is_subfolder=False):
 			'\"',
 			'remove_',
 			'ruin_',
+			'civic = random',
+			'random',
 		}
 		consecutive_blank_lines = 0
 		last_stripped_content = ''
