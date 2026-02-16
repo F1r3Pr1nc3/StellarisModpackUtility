@@ -31,13 +31,19 @@ except ImportError:
 	print("cydifflib not available, using standard difflib")
 
 # Default Test Paths (can be overridden by CLI args)
+old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.0")
+new_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.1")
+old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.0")
+new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.1")
+#####
 old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2")
 new_version_folder = Path("d:\\Steam\\steamapps\\common\\Stellaris")
-new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
 old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.2")
+new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
+#####
 
 # Configuration - Add/Remove more categories if needed, e.g. # "variables", "menace_perks", "starbase_buildings", "jobs" , "starbase_modules", "inline_scripts"
-rename_chk_cats = { "buildings", "triggers", "effects", "traits", "civics", "modifiers", "traditions" }
+rename_chk_cats = { "buildings", "triggers", "effects", "traits", "civics", "modifiers", "traditions", "variables", "menace_perks", "starbase_buildings", "jobs" , "starbase_modules", "inline_scripts" }
 scan_events = True
 scan_common = True
 do_logs = True
@@ -92,7 +98,8 @@ def extract_keys(folder: Path, compiled_pattern):
 					content = f.read()
 					matches = compiled_pattern.findall(content)
 					for match in matches:
-						keys[match] = file_path.name
+						if match != "inline_script":
+							keys[match] = file_path.name
 	return keys
 
 def extract_event_ids(folder: Path):
@@ -153,7 +160,7 @@ def extract_all_blocks(folder: Path, pattern):
 			blocks[key] = (block_text, file_path.name)
 	return blocks
 
-def detect_renamed_blocks(old_dict, new_dict, removed_keys, added_keys, threshold=0.6) -> list:
+def detect_renamed_blocks(old_dict, new_dict, removed_keys, added_keys, threshold=0.62) -> list:
 	renames = []
 	matched_new_keys = {}
 	logger.info(f"⇔ Starting renamed block detection: {len(removed_keys)} removed keys, {len(added_keys)} added keys")
