@@ -19,6 +19,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 import os
+from collections import Counter
 
 try:
 	# Try using the faster C implementation
@@ -31,10 +32,10 @@ except ImportError:
 	print("cydifflib not available, using standard difflib")
 
 # Default Test Paths (can be overridden by CLI args)
-old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.0")
-new_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.1")
-old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.0")
-new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.1")
+old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris3.14")
+new_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.3b")
+old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.3.14")
+new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
 #####
 old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2")
 new_version_folder = Path("d:\\Steam\\steamapps\\common\\Stellaris")
@@ -42,10 +43,13 @@ old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.
 new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
 #####
 
+optional_mod_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_fix") # For scan_usage mode
+
 # Configuration - Add/Remove more categories if needed, e.g. # "variables", "menace_perks", "starbase_buildings", "jobs" , "starbase_modules", "inline_scripts"
-rename_chk_cats = { "buildings", "triggers", "effects", "traits", "civics", "modifiers", "traditions", "variables", "menace_perks", "starbase_buildings", "jobs" , "starbase_modules", "inline_scripts" }
+rename_chk_cats = { "buildings", "triggers", "effects", "traits", "civics", "modifiers", "traditions", "jobs" , "starbase_modules", "inline_scripts" }
 scan_events = True
 scan_common = True
+scan_usage = False # of scripted triggers and effects
 do_logs = True
 debug = False
 
@@ -72,6 +76,8 @@ def parse_args():
 	parser.add_argument("--events", action="store_true", help="Enable event ID scanning")
 	parser.add_argument("--common", action="store_true", help="Enable common folder name scanning")
 	parser.add_argument("--logs", action="store_true", help="Enable triggers.log, effects.log and modifiers.log scanning")
+	parser.add_argument("--count_usage", action="store_true", help="Enable usage counting for scripted triggers and effects")
+	parser.add_argument("--mod", type=Path, help="Optional mod folder path for optimization")
 	return parser.parse_args()
 
 def write_summary(path: Path, title, lines, info):
@@ -160,7 +166,7 @@ def extract_all_blocks(folder: Path, pattern):
 			blocks[key] = (block_text, file_path.name)
 	return blocks
 
-def detect_renamed_blocks(old_dict, new_dict, removed_keys, added_keys, threshold=0.62) -> list:
+def detect_renamed_blocks(old_dict, new_dict, removed_keys, added_keys, threshold) -> list:
 	renames = []
 	matched_new_keys = {}
 	logger.info(f"⇔ Starting renamed block detection: {len(removed_keys)} removed keys, {len(added_keys)} added keys")
@@ -204,13 +210,13 @@ def write_diffs(old_items, new_items, category, old_path, new_path, renamed_pair
 		old_items = [i for i in old_items if i not in renamed_old_keys]
 		new_items = [i for i in new_items if i not in renamed_new_keys]
 		renamed_pairs = [f"{old} ({old_file}) -> {new} ({new_file}) ({ratio}%)" for old, new, ratio, old_file, new_file in renamed_pairs]
-		summary_lines.append(f"  Renamed: {len(renamed_pairs)}")
+		summary_lines.append(f"	Renamed: {len(renamed_pairs)}")
 
 	added = sorted(set(new_items) - set(old_items))
 	removed = sorted(set(old_items) - set(new_items))
 
-	summary_lines.append(f"  Added:   {len(added)}")
-	summary_lines.append(f"  Removed: {len(removed)}")
+	summary_lines.append(f"	Added:	{len(added)}")
+	summary_lines.append(f"	Removed: {len(removed)}")
 
 	write_summary(old_path, f"{category.upper()}", summary_lines, category)
 	write_summary(old_path, f"{category}_renamed.list", renamed_pairs, category)
@@ -269,8 +275,8 @@ def compare_logs(old_log_path, new_log_path, old_path: Path, new_path: Path):
 		old_blocks = extract_log_blocks(old_file, pattern)
 		new_blocks = extract_log_blocks(new_file, pattern)
 
-		logger.info(f"  Found {len(old_blocks)} items in old {log_file}")
-		logger.info(f"  Found {len(new_blocks)} items in new {log_file}")
+		logger.info(f"	Found {len(old_blocks)} items in old {log_file}")
+		logger.info(f"	Found {len(new_blocks)} items in new {log_file}")
 
 		old_keys = set(old_blocks.keys())
 		new_keys = set(new_blocks.keys())
@@ -288,9 +294,120 @@ def compare_logs(old_log_path, new_log_path, old_path: Path, new_path: Path):
 			renamed = detect_renamed_blocks(old_blocks_subset, new_blocks_subset, removed, added, threshold=0.74)
 
 		# Write standard list diffs
-		write_diffs(old_keys, new_keys, f"log_{cat}", old_path, new_path, renamed)
+		write_diffs(old_keys, new_keys, f"Native_{cat}_log", old_path, new_path, renamed)
 
-def compare_stellaris_data(old_path: Path, new_path: Path):
+def count_global_usages(folder: Path) -> Counter:
+	"""
+	Scans all .txt files in the folder (recursively), strips comments,
+	and counts word occurrences to estimate usage.
+	"""
+	logger.info(f"Counting usages in {folder}...")
+	usage_counter = Counter()
+	# Pre-compile regex for performance
+	comment_re = re.compile(r'#.*')
+	token_re = re.compile(r'\w+')
+
+	for file_path in folder.rglob("*.txt"):
+		if not file_path.is_file():
+			continue
+		try:
+			with file_path.open('r', encoding='utf-8', errors='replace') as f:
+				content = f.read()
+				# Remove comments
+				content = comment_re.sub('', content)
+				# Find words
+				words = token_re.findall(content)
+				usage_counter.update(words)
+		except Exception as e:
+			logger.warning(f"Failed to read {file_path}: {e}")
+
+	return usage_counter
+
+def write_usage_file(items: set, counter: Counter, category: str, path: Path):
+	"""
+	Writes a list of items with their usage counts to a separate file.
+	Excludes the definition itself (count - 1).
+	"""
+	filename = f"{category}_usage_counts.txt"
+
+	# Calculate counts first
+	usage_list = []
+	for item in items:
+		count = max(0, counter[item] - 1)
+		usage_list.append((item, count))
+
+	# Sort by count descending, then by item name ascending
+	usage_list.sort(key=lambda x: (-x[1], x[0]))
+
+	lines = [f"{item} ({count})" for item, count in usage_list]
+
+	with (path / filename).open('w', encoding='utf-8') as f:
+		f.write(f"# Usage counts for {category}\n")
+		f.write('\n'.join(lines))
+	logger.info(f"{category} usage counts written to: {filename}")
+
+def optimize_mod_triggers(mod_path: Path, usage_counter: Counter = None):
+	"""
+	Scans the mod's scripted_triggers and adds 'optimize_memory # Vfix opt'
+	to each trigger if not already present AND usage count is > 37.
+	"""
+	triggers_path = mod_path / "common" / "scripted_triggers"
+	if not triggers_path.exists():
+		logger.warning(f"Mod scripted_triggers folder not found: {triggers_path}")
+		return
+
+	logger.info(f"Optimizing scripted triggers in: {triggers_path}")
+
+	# Regex to find trigger definitions: key = {
+	trigger_def_re = re.compile(r'^([\w\d_]+)\s*=\s*\{', re.MULTILINE)
+	# Regex to check if optimize_memory follows immediately (allowing comments/newlines)
+	# We look for optimize_memory at the start of the string (after the match)
+	check_re = re.compile(r'^\s*(?:#.*?\n\s*)*optimize_memory', re.MULTILINE)
+
+	for file_path in triggers_path.rglob("*.txt"):
+		if not file_path.is_file():
+			continue
+
+		try:
+			with file_path.open('r', encoding='utf-8') as f:
+				content = f.read()
+
+			new_content = []
+			last_pos = 0
+			modified = False
+
+			for match in trigger_def_re.finditer(content):
+				trigger_name = match.group(1)
+				# Append text up to the end of "key = {"
+				new_content.append(content[last_pos:match.end()])
+
+				# Check what comes next
+				post_match = content[match.end():]
+
+				# Optimization condition: count > 37
+				usage_count = usage_counter.get(trigger_name, 0) - 1 if usage_counter else 0
+
+				if usage_count > 37 and not check_re.match(post_match):
+					# optimize_memory NOT found "immediately"
+					# Insert it with newlines to ensure safety regarding comments
+					new_content.append('\n\toptimize_memory # Vfix opt')
+					modified = True
+
+				last_pos = match.end()
+
+			if modified:
+				new_content.append(content[last_pos:])
+				final_text = "".join(new_content)
+				# Clean up potentially double newlines if we care, but safety first
+				with file_path.open('w', encoding='utf-8') as f:
+					f.write(final_text)
+				logger.info(f"Optimized: {file_path.name}")
+
+		except Exception as e:
+			logger.error(f"Failed to optimize {file_path}: {e}")
+
+
+def compare_stellaris_data(old_path: Path, new_path: Path, mod_path: Path = None):
 	# Initialize diff file
 	try:
 		(old_path / diff_file_name).unlink(missing_ok=True)
@@ -300,27 +417,32 @@ def compare_stellaris_data(old_path: Path, new_path: Path):
 	with (old_path / diff_file_name).open('w', encoding='utf-8') as f:
 		f.write(header)
 
+	global_usage_counter = None
+	if scan_usage:
+		global_usage_counter = count_global_usages(new_path)
+
 	category_configs = {
-		"traits":      (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traits")),
-		"techs":       (re.compile(r'^(tech_\w+) = \{', re.MULTILINE), Path("common/technology")),
-		"triggers":    (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_triggers")),
-		"traditions":    (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traditions")),
-		"effects":     (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_effects")),
-		"jobs":        (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/pop_jobs")),
-		"buildings":   (re.compile(r'^((?:building|holding)_\w+) = \{', re.MULTILINE), Path("common/buildings")),
-		"menace_perks":   (re.compile(r'^(menp_\w+) = \{', re.MULTILINE), Path("common/menace_perks")),
-		"starbase_buildings": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_buildings")),
-		"starbase_modules": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_modules")),
-		"districts":   (re.compile(r'^(district_\w+) = \{', re.MULTILINE), Path("common/districts")),
-		"civics":      (re.compile(r'^((?:civic|origin)_\w+) = \{', re.MULTILINE), Path("common/governments/civics")),
-		"governments": (re.compile(r'^(gov_\w+) = \{', re.MULTILINE), Path("common/governments")),
-		"script_values": (re.compile(r'^(\w+)\s*=', re.MULTILINE), Path("common/script_values")),
-		"variables":   (re.compile(r'^@(\w+)\s*=', re.MULTILINE), Path("common/scripted_variables")),
-		"defines":     (re.compile(r'^\t+([A-Z0-9_]+)\s*=', re.MULTILINE), Path("common/defines")),
-		"inline_scripts": (None, Path("common/inline_scripts")),
+		"traits":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traits"), 0.62),
+		"techs":			(re.compile(r'^(tech_\w+) = \{', re.MULTILINE), Path("common/technology"), 0.62),
+		"triggers":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_triggers"), 0.62),
+		"traditions":		(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traditions"), 0.62),
+		"effects":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_effects"), 0.62),
+		"jobs":				(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/pop_jobs"), 0.62),
+		"buildings":		(re.compile(r'^((?:building|holding)_\w+) = \{', re.MULTILINE), Path("common/buildings"), 0.62),
+		"menace_perks":		(re.compile(r'^(menp_\w+) = \{', re.MULTILINE), Path("common/menace_perks"), 0.62),
+		"starbase_buildings": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_buildings"), 0.62),
+		"starbase_modules": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_modules"), 0.62),
+		"districts":		(re.compile(r'^(district_\w+) = \{', re.MULTILINE), Path("common/districts"), 0.62),
+		"civics":			(re.compile(r'^((?:civic|origin)_\w+) = \{', re.MULTILINE), Path("common/governments/civics"), 0.62),
+		"governments":		(re.compile(r'^(gov_\w+)\s*=\s*\{', re.MULTILINE), Path("common/governments"), 0.62),
+		"script_values":	(re.compile(r'^(\w+)\s*=', re.MULTILINE), Path("common/script_values"), 0.62),
+		"variables":		(re.compile(r'^@(\w+)\s*=', re.MULTILINE), Path("common/scripted_variables"), 0.62),
+		"defines":			(re.compile(r'^\t+([A-Z0-9_]+)\s*=', re.MULTILINE), Path("common/defines"), 0.62),
+		"colony_types":		(re.compile(r'^(col_\w+)\s*=\s*\{', re.MULTILINE), Path("common/colony_types"), 0.62),
+		"inline_scripts": (None, Path("common/inline_scripts"), 0.74),
 	}
 
-	for cat, (pattern, subpath) in category_configs.items():
+	for cat, (pattern, subpath, threshold) in category_configs.items():
 		logger.info(f"Processing category: {cat.upper()}")
 		old_dir = old_path / subpath
 		new_dir = new_path / subpath
@@ -342,9 +464,16 @@ def compare_stellaris_data(old_path: Path, new_path: Path):
 			old_blocks = {k: old_blocks_all[k] for k in removed if k in old_blocks_all}
 			new_blocks = {k: new_blocks_all[k] for k in added if k in new_blocks_all}
 
-			renamed = detect_renamed_blocks(old_blocks, new_blocks, removed, added)
+			renamed = detect_renamed_blocks(old_blocks, new_blocks, removed, added, threshold)
 
 		write_diffs(old_items, new_items, cat, old_path, new_path, renamed)
+
+		if scan_usage and global_usage_counter and cat in ["triggers", "effects"]:
+			write_usage_file(new_items, global_usage_counter, cat, old_path)
+
+			# If we are processing triggers and usage scan is active, check for mod optimization
+			if cat == "triggers" and mod_path:
+				optimize_mod_triggers(mod_path, global_usage_counter)
 
 	# Modifiers
 	modifier_paths = [
@@ -382,7 +511,7 @@ def compare_stellaris_data(old_path: Path, new_path: Path):
 		old_blocks = {k: old_blocks_all[k] for k in removed if k in old_blocks_all}
 		new_blocks = {k: new_blocks_all[k] for k in added if k in new_blocks_all}
 
-		renamed = detect_renamed_blocks(old_blocks, new_blocks, removed, added)
+		renamed = detect_renamed_blocks(old_blocks, new_blocks, removed, added, threshold=0.62)
 
 	write_diffs(old_items, new_items, "modifiers", old_path, new_path, renamed)
 
@@ -419,5 +548,8 @@ if __name__ == "__main__":
 		scan_events = args.events
 	if args.common:
 		scan_common = args.common
+	if args.count_usage:
+		scan_usage = args.count_usage
 
-	compare_stellaris_data(old_path, new_path)
+	mod_path = args.mod if args.mod else optional_mod_folder
+	compare_stellaris_data(old_path, new_path, mod_path)
