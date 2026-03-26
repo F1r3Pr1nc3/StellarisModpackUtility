@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # @Author: FirePrince
-# @Revision: 2026/02/03@mod
+# @Revision: 2026/03/26@mod
 # If you find this tool helpful, consider supporting development:
 # 	Buy me a coffee on Ko-fi https://ko-fi.com/f1r3pr1nc3
 # 	Donate via PayPal https://www.paypal.me/supportfireprinc
@@ -15,20 +15,26 @@
 # @TODO: replace in *.YML ?
 
 # ============== Import libs Python 3.9 ===============
-import re
-import ctypes.wintypes
-import sys
-import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox
-import logging
-import argparse
-# import datetime
-import time
 from collections import defaultdict
-from typing import List, Tuple
 from pathlib import Path # Replaced os and glob with pathlib
-# my sub-module
+from tempfile import TemporaryDirectory
+from typing import List, Tuple
+import argparse
+import logging
+import os
+import re
+import sys
+import time
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+# Import utils from the parent folder
+sys.path.append(
+	os.path.join(
+		Path(os.path.realpath(__file__)).parent, 'utils'
+	)
+)
+
 from utils import logic_optimizer
 from utils import check_civics
 
@@ -36,45 +42,30 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)	   # Ensure all levels pass through
 logger.propagate = False			 # Prevent double logging
 
-ACTUAL_STELLARIS_VERSION_FLOAT = "3.14"  #  Should be number string
+# Used in code to determine target version and select appropriate string replacements during work
+ACTUAL_STELLARIS_VERSION_FLOAT = "4.0"  #  Should be number string
+
+# Used to write the target game version to descriptor.mod after all changes are finished
 FULL_STELLARIS_VERSION = ACTUAL_STELLARIS_VERSION_FLOAT + '.0' # @last supported sub-version
+
 # Default values C:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod
-mod_path = Path("C:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod") # Initialized as Path object # D:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_fix # Stellaris4.2_update_maker
-only_warning = 0
-only_actual = 0
-code_cosmetic = 1 # Still BETA
-also_old = 0
-mergerofrules = 0 # Forced support for compatibility with The Merger of Rules (MoR)
-keep_default_country_trigger = 0
+# mod_path = Path("C:\\Users\\User\\Documents\\Paradox Interactive\\Stellaris\\mod") # Initialized as Path object # D:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_fix # Stellaris4.2_update_maker
+
+# Defaults and globals
+mod_path = Path(SCRIPT_DIR)  # basically, the folder that the script is being run from
+only_warning = False
+only_actual = False
+code_cosmetic = True # Still BETA
+also_old = False
+mergerofrules = False # Forced support for compatibility with The Merger of Rules (MoR)
+keep_default_country_trigger = False
 mod_outpath = ""  # if you don't want to overwrite the original, Initialized as empty Path
 log_file = "modupdater.log" # Changed to Path object
 # Dev options
-debug_mode = 0 # without writing file=log_file
+debug_mode = False # without writing file=log_file
 basic_fixes = True
 full_code_cosmetic = False # for extended code_cosmetic option
 any_merger_check = False # for merger_of_rules option
-
-def parse_arguments():
-	parser = argparse.ArgumentParser(
-		description="Stellaris Mod Updater v4.0 script by FirePrince.\n",
-		formatter_class=argparse.ArgumentDefaultsHelpFormatter
-	)
-	parser.add_argument('-w', '--only_warning', action='store_true', help='Enable only_warning mode (implies code_cosmetic = False)')
-	parser.add_argument('-c', '--code_cosmetic', action='store_true', help='Enable code_cosmetic mode (only if only_warning is False)')
-	parser.add_argument('-a', '--only_actual', action='store_true', help='Check only the latest version')
-	parser.add_argument('-o', '--also_old', action='store_true', help='Include support for pre-2.3 versions (beta)')
-	parser.add_argument('-d', '--debug_mode', action='store_true', help='Enable debug mode for development prints')
-	parser.add_argument('-m', '--mergerofrules', action='store_true', help='Forced support for compatibility with The Merger of Rules (MoR)')
-	parser.add_argument('-k', '--keep_default_country_trigger', action='store_true', help='Keep default country trigger')
-	parser.add_argument('-ut', '--ACTUAL_STELLARIS_VERSION_FLOAT', type=str, default="4.0", help='Specify the version number to update only, e.g., 3.7')
-	parser.add_argument('-input', '--mod_path', type=Path, default=None, help='Path to the mod directory') # Changed type to Path
-	parser.add_argument('-output', '--mod_outpath', type=Path, default=None, help='(Optional) Output path for the updated mod') # Changed type to Path
-
-	return parser.parse_args()
-
-# Process boolean parameters
-def setBoolean(s):
-	s = bool(s)
 
 # if not sys.version_info.major == 3 and sys.version_info.minor >= 6:
 #   print("Python 3.6 or higher is required.")
@@ -88,7 +79,6 @@ RESOURCE_ITEMS = r"advanced_logic|alloys|astral_threads|biomass|consumer_goods|e
 # NO_EFFECT_FOLDER = re.compile(r"^(?!common/scripted_effects)")
 NO_TRIGGER_FOLDER = re.compile(r"^([^_]+)(_(?!trigger)[^/_]+|[^_]*$)(?(2)/([^_]+)_[^/_]+$)?")  # 2lvl, only 1lvl folder: ^([^_]+)(_(?!trigger)[^_]+|[^_]*)$ only
 ACTUAL_STELLARIS_VERSION_FLOAT = float(ACTUAL_STELLARIS_VERSION_FLOAT)
-print(f"ACTUAL_STELLARIS_VERSION_FLOAT {ACTUAL_STELLARIS_VERSION_FLOAT}")
 triggerScopes = r"leader|owner|controller|overlord|space_owner|(?:prev){1,4}|(?:from){1,4}|root|this|event_target:[\w@]+"
 if ACTUAL_STELLARIS_VERSION_FLOAT > 4.0:
 	triggerScopes += r"|owner_or_space_owner"
@@ -2339,25 +2329,6 @@ def is_float(s):
 	except ValueError:
 		return False
 
-def mBox(mtype, text):
-	tk.Tk().withdraw()
-	style = (
-		not mtype
-		and messagebox.showinfo
-		or mtype == "Abort"
-		and messagebox.showwarning
-		or messagebox.showerror
-	)
-	style(title=mtype, message=text)
-
-def iBox(title, prefil):  # , master
-	answer = filedialog.askdirectory(
-		initialdir=prefil,
-		title=title,
-		# parent=master
-	)
-	return answer
-
 # ============== Set paths ===============
 def extract_scripted_triggers() -> dict: # Changed return type hint to dict
 	"""
@@ -2402,115 +2373,6 @@ def merg_planet_rev_lambda(p):
 	"yes": "is_planet_class = pc_" + p.group(1),
 	"no": "NOT = { is_planet_class = pc_" + p.group(1) + " }"
 	}[p.group(2)]
-
-def apply_merger_of_rules(targets3, targets4, triggers_in_mod, is_subfolder=False):
-	"""Define the Merger of Rules triggers and check if they exist in the mod.
-	--mergerofrules: Enable Merger of Rules compatibility mode.
-	This flag forces compatibility logic for mods that use The Merger of Rules. When enabled, the script automatically scans your mod for custom scripted_triggers, and attempts to detect and apply supported MoR triggers individually.
-	If a known MoR trigger is present in your mod, it will be converted automatically.
-	If a trigger is not found, it will be safely skipped, avoiding unnecessary edits.
-	This flag works even if your mod doesn't include the full Merger of Rules — useful for partial adoption or integration.
-	"""
-	if ACTUAL_STELLARIS_VERSION_FLOAT > 3.7:
-		tar3 = {
-			# v3.8 former merg_is_standard_empire Merger Rule now vanilla
-			r"\bmerg_is_standard_empire = (yes|no)": r"is_default_or_fallen = \1",
-		}
-	else:
-		tar3 = {}
-	tar4 = {
-		r"(?:(\s+)merg_is_(?:fallen_empire|awakened_fe) = yes){2}": (("T", "is_fallen_empire"), r"\1is_fallen_empire = yes"),
-		r"(?:(\s+)merg_is_(?:default_empire|awakened_fe) = yes){2}": (("T", "is_country_type_with_subjects"), r"\1is_country_type_with_subjects = yes"),
-		r"(?:(\s+)merg_is_(?:default|fallen)_empire = yes){2}": (("T", "is_default_or_fallen"), r"\1is_default_or_fallen = yes"),
-	}
-
-	merger_triggers = {
-		"is_endgame_crisis": (
-			r"((?:(\s+)(?:is_country_type = (?:awakened_)?synth_queen(?:_storm)?|is_endgame_crisis = yes)\b){2,3}|(?:(\s+)is_country_type = (?:extradimensional(?:_[23])?|swarm|ai_empire)\b){5})",
-			(NO_TRIGGER_FOLDER, r"\2\3is_endgame_crisis = yes"),
-			4
-		),
-		"merg_is_fallen_empire": (r"\bis_country_type = fallen_empire\b", (("T", "merg_is_fallen_empire"), "merg_is_fallen_empire = yes")),
-		"merg_is_awakened_fe": (r"\bis_country_type = awakened_fallen_empire\b", (("T", "merg_is_awakened_fe"), "merg_is_awakened_fe = yes")),
-		"merg_is_hab_ringworld": (r"\b(is_planet_class = pc_ringworld_habitable\b|uses_district_set = ring_world\b|is_planetary_diversity_ringworld = yes|is_giga_ringworld = yes)" ,
-			(("T", "merg_is_hab_ringworld"), "merg_is_hab_ringworld = yes")),
-		"merg_is_hive_world": (r"\b(is_planet_class = pc_hive\b|is_pd_hive_world = yes)", (("T", "merg_is_hive_world"), "merg_is_hive_world = yes")),
-		"merg_is_relic_world": (r"\bis_planet_class = pc_relic\b", (("T", "merg_is_relic_world"), "merg_is_relic_world = yes")),
-		"merg_is_machine_world": (r"\b(is_planet_class = pc_machine\b|is_pd_machine = yes)", (("T", "merg_is_machine_world"), "merg_is_machine_world = yes")),
-		"merg_is_habitat": (r"\b(is_planet_class = pc_habitat|is_pd_habitat = yes)\b", (("T", "merg_is_habitat"), "merg_is_habitat = yes")),
-		"merg_is_molten": (r"is_planet_class = pc_molten\b", (("T", "merg_is_molten"), "merg_is_molten = yes")),
-		"merg_is_toxic": (r"is_planet_class = pc_toxic\b", (("T", "merg_is_toxic"), "merg_is_toxic = yes")),
-		"merg_is_frozen": (r"is_planet_class = pc_frozen\b", (("T", "merg_is_frozen"), "merg_is_frozen = yes")),
-		"merg_is_barren": (r"is_planet_class = pc_barren\b", (("T", "merg_is_barren"), "merg_is_barren = yes")),
-		"merg_is_barren_cold": (r"is_planet_class = pc_barren_cold\b", (("T", "merg_is_barren_cold"), "merg_is_barren_cold = yes")),
-		"merg_is_gaia_basic": (r"\b(is_planet_class = pc_gaia|pd_is_planet_class_gaia = yes)\b", (("T", "merg_is_gaia_basic"), "merg_is_gaia_basic = yes")),
-		"merg_is_gas_giant": (r"\b(is_planet_class = pc_gas_giant)\b", (("T", "merg_is_gas_giant"), "merg_is_gas_giant = yes")),
-		"merg_is_arcology": (r"\b(is_planet_class = pc_city\b|is_pd_arcology = yes|is_city_planet = yes)" , (("T", "merg_is_arcology"), "merg_is_arcology = yes")),
-	}
-	if not keep_default_country_trigger:
-		merger_triggers["merg_is_default_empire"] = (r"\bis_country_type = default\b", (("T", "merg_is_default_empire"), "merg_is_default_empire = yes"))
-
-	if mergerofrules:
-		for trigger in merger_triggers:
-			if len(merger_triggers[trigger]) == 3:
-				tar4[merger_triggers[trigger][0]] = merger_triggers[trigger][1]
-			else:
-				tar3[merger_triggers[trigger][0]] = merger_triggers[trigger][1]
-
-		if not keep_default_country_trigger:
-			# without is_country_type_with_subjects & without is_fallen_empire = yes
-			tar4[
-				r"\n\t+(?:(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes))|(?:(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = default|merg_is_default_empire = yes))|(?:(?:is_country_type = default|merg_is_default_empire = yes)\s+(is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)\s+(?:is_country_type = fallen_empire|merg_is_fallen_empire = yes)))"
-			] = [
-				r"((\n\t+)(?:is_country_type = default|merg_is_default_empire = yes|is_country_type = fallen_empire|merg_is_fallen_empire = yes|is_country_type = awakened_fallen_empire|merg_is_awakened_fe = yes)){2,4}",
-				(("T", "is_default_or_fallen"), r"\2is_default_or_fallen = yes"),
-			]
-	elif not is_subfolder:
-		# triggers_in_mod = extract_scripted_triggers()
-		merger_reverse_triggers = {
-			"merg_is_default_empire": (r"\bmerg_is_default_empire = (yes|no)", lambda p: {"yes": "is_country_type = default", "no": "NOT = { is_country_type = default }"}[p.group(1)] ),
-			"merg_is_fallen_empire": (r"\bmerg_is_fallen_empire = (yes|no)", lambda p: {"yes": "is_country_type = fallen_empire", "no": "NOT = { is_country_type = fallen_empire }"}[p.group(1)] ),
-			"merg_is_awakened_fe": (r"\bmerg_is_awakened_fe = (yes|no)", lambda p: {"yes": "is_country_type = awakened_fallen_empire", "no": "NOT = { is_country_type = awakened_fallen_empire }"}[p.group(1)] ),
-			"merg_is_hab_ringworld": ( r"\bmerg_is_hab_ringworld = (yes|no)", r"has_ringworld_output_boost = \1" ),
-			"merg_is_hive_world": ( r"\bmerg_is_(hive)_world = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_relic_world": ( r"\bmerg_is_(relic)_world = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_machine_world": ( r"\bmerg_is_(machine)_world = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_habitat": ( r"\bmerg_is_(habitat) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_molten": ( r"\bmerg_is_(molten) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_toxic": ( r"\bmerg_is_(toxic) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_frozen": ( r"\bmerg_is_(frozen) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_barren": ( r"\bmerg_is_(barren) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_barren_cold": ( r"\bmerg_is_(barren_cold) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_gaia_basic": ( r"\bmerg_is_(gaia)_basic = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_gas_giant": ( r"\bmerg_is_(gas_giant) = (yes|no)", merg_planet_rev_lambda ),
-			"merg_is_arcology": ( r"\bmerg_is_arcology = (yes|no)", lambda p: {"yes": "is_planet_class = pc_city", "no": "NOT = { is_planet_class = pc_city }"}[p.group(1)] ),
-		}
-
-		for trigger in merger_triggers:
-			if trigger in triggers_in_mod:
-				if len(merger_triggers[trigger]) == 3:
-					# Filename, replace pattern
-					tar4[merger_triggers[trigger][0]] = [ merger_triggers[trigger][0], { triggers_in_mod[trigger]: merger_triggers[trigger][1][1] } ]
-				else:
-					tar3[merger_triggers[trigger][0]] = { triggers_in_mod[trigger]: merger_triggers[trigger][1][1] }  # merger_triggers[trigger][1]
-
-				logger.debug(f"Enabling conversion for MoR trigger: {trigger}")
-			elif trigger in merger_reverse_triggers:
-				tar3[merger_reverse_triggers[trigger][0]] = merger_reverse_triggers[trigger][1]
-				logger.debug(f"Removing nonexistent MoR trigger: {trigger}")
-
-	### Pre-Compile regexps
-	tar3 = [(re.compile(k, flags=0), tar3[k]) for k in tar3]
-	tar4 = [(re.compile(k, flags=re.I), tar4[k]) for k in tar4]
-
-	# Cleanup is_default_empire
-	if mergerofrules:
-		targets4.append((re.compile(r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)(?:is_country_type = default|CmtTriggerIsPlayableEmpire = yes|is_zofe_compatible = yes|merg_is_default_empire = yes)\s*" % VANILLA_PREFIXES), r"\1"))
-
-	targets3.extend(tar3)
-	targets4.extend(tar4)
-
-	return (targets3, targets4)
 
 # (since v4.0)
 def convert_prescripted_countries_flags():
@@ -2761,29 +2623,14 @@ def parse_dir():
 
 	print(f"Welcome to Stellaris Mod-Updater-{FULL_STELLARIS_VERSION} by FirePrince!")
 
-	if (
-		not mod_path.is_dir() or
-		not any((mod_path / comp).exists() for comp in ["descriptor.mod", "common", "events"])
-		):
-		mod_path = Path.cwd() if not mod_path.is_dir() else mod_path
-		mod_path_str = iBox("Please select a mod folder:", str(mod_path))
-		if mod_path_str:
-			mod_path = Path(mod_path_str).resolve()
-		else:
-			print("No folder selected. Aborting.")
-			sys.exit()
+	# File path checks were moved to __main__.py
 
 	if not mod_path.is_dir():
 		# except OSError:
 		#   print('Unable to locate the mod path %s' % mod_path)
-		mBox("Error", "Unable to locate the mod path %s" % mod_path)
+		print("Error", "Unable to locate the mod path %s" % mod_path)
 		return False
-	if (
-		not mod_outpath or
-		not mod_outpath.is_dir()
-		or mod_outpath == mod_path
-	):
-		mod_outpath = mod_path
+
 		if only_warning:
 			print("ATTENTION: files are ONLY checked!")
 		else:
@@ -2896,7 +2743,8 @@ def modfix(file_list, is_subfolder=False):
 	triggers_in_mod = extract_scripted_triggers()
 	tar3, tar4 = list(targets3), list(targets4)
 	if any_merger_check:
-		tar3, tar4 = apply_merger_of_rules(tar3, tar4, triggers_in_mod, is_subfolder)
+		# tar3, tar4 = apply_merger_of_rules(tar3, tar4, triggers_in_mod, is_subfolder)
+		pass
 	else:
 		# Cleanup is_country_type = default
 		tar4.append((re.compile(r"((?:%s)_playable_country = \{[^{}#]*?(?:limit = \{\s+)?)is_country_type = default\s*" % VANILLA_PREFIXES), r"\1"))
@@ -4514,48 +4362,187 @@ class SafeFormatter(logging.Formatter):
 		# Only sanitize non-printables directly in the str
 		return message
 
+# def write_new_supported_version_to_mod_descriptor(mod_folder_path, updated_stellaris_version: float) -> None:
+# 	mod_descriptor_file = os.path.join(mod_folder_path, 'descriptor.mod')
+# 	descriptor_contents = ''
+# 	with open(mod_descriptor_file) as mod_descriptor_file_obj:
+# 		descriptor_contents = mod_descriptor_file_obj.read()
+
+# 	version_as_str = str(updated_stellaris_version)
+# 	# Add an asterisk if there isn't a full, specific version recorded as the target
+# 	if not version_as_str.count('.') == 3:
+# 		version_as_str += '.*'
+
+# 	descriptor_contents = re.sub(
+# 		r"supported_version=\".*\"",
+# 		f"supported_version=\"{str(version_as_str)}\""
+# 	)
+# 	with open(mod_descriptor_file, 'w') as mod_descriptor_file_obj:
+# 		mod_descriptor_file_obj.write(descriptor_contents)
+
+
+def read_mod_descriptor(mod_folder_path: Path) -> dict:
+	# look in descriptor.mod and parse supported version and name
+	mod_descriptor_file = os.path.join(mod_folder_path, 'descriptor.mod')
+	mod_name = ''
+	mod_name_re = r"name=\"(?P<modname>.*)\""
+	mod_name_rx = re.compile(mod_name_re)
+	mod_own_version = ''	 	# What is the mod's own self-appointed version
+	mod_own_version_re = r"\bversion=\"(.*)\""
+	mod_own_version_rx = re.compile(mod_own_version_re)
+	mod_recorded_version = ''  # What version of Stellaris is it for
+	supported_version_re = r"supported_version=\"v((?P<major_version>\d)\.(?P<minor_version>\d{1,})\.(?P<patch_version>[\*|\d{1,}])\")"
+	supported_version_rx = re.compile(supported_version_re)
+
+	with open(mod_descriptor_file) as mod_descriptor_file_obj:
+		for line in mod_descriptor_file_obj:
+			if supported_version_match := supported_version_rx.search(line):
+				mod_recorded_version = "{maj}.{min}.{pat}".format(
+					maj=supported_version_match.group('major_version'),
+					min=supported_version_match.group('minor_version'),
+					pat=supported_version_match.group('patch_version')
+				)
+			elif mod_name_match := mod_name_rx.search(line):
+				mod_name = mod_name_match.group('modname')
+			elif mod_own_version_match := mod_own_version_rx.search(line):
+				mod_own_version = mod_own_version_match.group()
+
+	return {
+		"version": mod_recorded_version,
+		"name": mod_name,
+		'own_version': mod_own_version
+	}
+
+def validate_command_options(_mod_path, target_stellaris_version) -> None:
+	""" Ask user to confirm options, and check folders exist
+		Note that this method writes to globals """
+	if not os.path.exists(_mod_path) or not os.path.isdir(_mod_path):
+		sys.exit(
+			f"Could not find mod path: '{_mod_path}'. Please check you typed the path correctly when running this updater."
+		)
+	if not any(
+		[
+			os.path.exists(os.path.join(_mod_path, comp))
+			for comp in ["descriptor.mod", "common", "events"]
+		]
+	):
+		sys.exit(
+			"The mod path was missing one or more expected mod files (descriptor.mod, common/, events/) "
+			f"in {_mod_path}. Please check the mod path."
+		)
+
+	mod_info = read_mod_descriptor(_mod_path)
+	print(
+		f"+ Found Mod name: {mod_info['name']}, currently at Stellaris version {mod_info['version']}\n+   at {_mod_path}"
+	)
+
+	backup_question_check = input(
+		"\n? - Before we start: Did you back up your mod's files? Respond with 'yes' or 'no' > "
+	)
+	if backup_question_check.lower().strip() != "yes":
+		sys.exit(
+			"Not going to proceed (didn't get 'yes'). Go backup your files and try again."
+		)
+
+	details_are_correct_check = input(
+		f"\n? - You are going to update {mod_info['name']} FROM {mod_info['version']} TO {target_stellaris_version}.\n"
+		f"    The changes will be written to {globals()['mod_outpath']}.\n"
+		"Is this correct? Respond with 'yes' or 'no' (y/n) > "
+	)
+	if details_are_correct_check.lower().strip() not in ["yes", "y", "yeah"]:
+		sys.exit(
+			"Not going to proceed. Start the utility with the options you expected."
+		)
+
+
+def parse_arguments():
+
+	parser = argparse.ArgumentParser(
+		description="Stellaris Mod Updater v4.0 script by FirePrince.\n",
+		formatter_class=argparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add_argument(
+		'-w', '--only_warning', action='store_true', help='Enable only_warning mode (implies code_cosmetic = False)',
+		default=globals()['only_warning']
+	)
+	parser.add_argument(
+		'-c', '--code_cosmetic', action='store_true', help='Enable code_cosmetic mode (only if only_warning is False)',
+		default=globals()['code_cosmetic']
+	)
+	parser.add_argument(
+		'-a', '--only_actual', action='store_true', help='Check only the latest version',
+		default=globals()['only_actual']
+	)
+	parser.add_argument(
+		'-o', '--also_old', action='store_true', help='Include support for pre-2.3 versions (beta).',
+		default=globals()['also_old']
+	)
+	parser.add_argument(
+		'-d', '--debug_mode', action='store_true', help='Print extra information while running this utility, for example if you need to troubleshoot something',
+		default=globals()['debug_mode']
+	)
+	# parser.add_argument(
+	# 	'-m', '--mergerofrules', action='store_true', help='Forced support for compatibility with The Merger of Rules (MoR)',
+	# 	default=mergerofrules
+	# )
+	parser.add_argument(
+		'-k', '--keep_default_country_trigger', action='store_true', help='Keep default country trigger',
+		default=globals()['keep_default_country_trigger']
+	)
+	parser.add_argument(
+		'-ut', '--target_version', type=str, default=globals()['ACTUAL_STELLARIS_VERSION_FLOAT'], help='What Stellaris game version to update the mod to, e.g., 3.7. Note that you can downgrade a mod by giving a lower Stellaris version here.',
+	)
+	parser.add_argument(
+		'-input', '--mod_path', type=Path, default=None, help='Path to the mod folder that you want to update.', required=True
+	) # Changed type to Path
+	parser.add_argument(
+		'-output', '--mod_outpath', type=Path, default=None, help='By default, the utility will put changed files in the same folder as where you are running this utility. If you want to update your mod directly, put the mod folder path with the "-output" parameter, or run this script directly from your mod folder. If you want to run this utility, but not update your mod, either run this script from another folder (not your mod folder) or tell the utility where to put the files with "-output".'
+	) # Changed type to Path
+
+	return parser.parse_args()
+
+
+def validate_user_target_version(target_version: str) -> float:
+	""" Return 0 if it's not recognized """
+	try:
+		target_version_float = float(target_version)
+	except ValueError as exc:
+		target_version_float = 0.0
+	return target_version_float
+
 if __name__ == "__main__":
 	# Configure basic logging - this can be overridden by argparse later
 	# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+	print(
+		"Stellaris Mod Updater v4.0 script by FirePrince\n"
+		"Tool to update old mods in order to help them get working with recent Stellaris game versions."
+	)
+
 	args = parse_arguments()
-	if args.mod_path: mod_path = args.mod_path
-	if args.mod_outpath: mod_outpath = args.mod_outpath
-	if args.only_warning: only_warning = args.only_warning
-	if args.only_actual: only_actual = args.only_actual
-	if args.code_cosmetic: code_cosmetic = args.code_cosmetic
+	""" Take the result of argparse, and record any changes in the options """
+	mod_path = args.mod_path  # Making this required
+	# if args.mergerofrules: mergerofrules = args.mergerofrules
 	if args.also_old: also_old = args.also_old
+	if args.code_cosmetic: code_cosmetic = args.code_cosmetic
 	if args.debug_mode: debug_mode = args.debug_mode
-	if args.mergerofrules: mergerofrules = args.mergerofrules
 	if args.keep_default_country_trigger: keep_default_country_trigger = args.keep_default_country_trigger
-
-	setBoolean(only_warning)
-	setBoolean(code_cosmetic)
-	setBoolean(only_actual)
-	setBoolean(also_old)
-	setBoolean(debug_mode)
-	setBoolean(mergerofrules)
-	setBoolean(keep_default_country_trigger)
-
-	if mod_path and mod_path != "":
-		mod_path = Path(mod_path).resolve()
-	if (
-		mod_path is None
-		or not str(mod_path)
-		or not mod_path.exists()
-		or not mod_path.is_dir()
-		):
-		stellaris_mod_path = Path.home() / "Documents" / "Paradox Interactive" / "Stellaris" / "mod"
-		if stellaris_mod_path.exists():
-			mod_path = stellaris_mod_path
-		else:
-			CSIDL_PERSONAL = 5
-			SHGFP_TYPE_CURRENT = 0
-			temp = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-			ctypes.windll.shell32.SHGetFolderPathW(
-				None, CSIDL_PERSONAL, None, SHGFP_TYPE_CURRENT, temp
+	if args.mod_outpath: mod_outpath = args.mod_outpath
+	if args.mod_outpath: mod_outpath = args.mod_outpath
+	if args.mod_path: mod_path = args.mod_path
+	if args.only_actual: only_actual = args.only_actual
+	if args.only_warning: only_warning = args.only_warning
+	if args.target_version:
+		user_target_version = validate_user_target_version(args.target_version)
+		if user_target_version == 0.0:
+			sys.exit(
+				f"x - Couldn't figure out what Stellaris version you wanted from '{args.target_version}'. It should be something like '3.14' or '4.2'"
 			)
-			mod_path = Path(temp.value) / "Paradox Interactive" / "Stellaris" / "mod"
+		else:
+			ACTUAL_STELLARIS_VERSION_FLOAT = args.target_version
+
+	""" Check with user that the settings are correct """
+	validate_command_options(mod_path, ACTUAL_STELLARIS_VERSION_FLOAT)
 
 	start_time = 0
 	# exit()
