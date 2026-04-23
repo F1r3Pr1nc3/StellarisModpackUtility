@@ -48,11 +48,17 @@ text_to_remove_list = [
 		"cannot build any component in the component set", # for now
 		"cannot find category with key:  ", # Vanilla bug
 		"Script error, restore_country_backup_data", # Vanilla bug
-
+		"[game_text.cpp:1532]: Unknown promotion", # Vanilla bug
+		"[game_text.cpp:1287]: Unknown promotion", # Vanilla bug
+		"change_government effect failed to calculate configuration for country", # Vanilla bug
+		"", # Vanilla
+		# "Trigger count_owned_pop_amount cannot be used in this context", # Vanilla
+		"[fleet], file: common/storm_types/00_storm_types.txt", # Vanilla
 ]
 # very specific one-liner
 text_first_remove_list = [
-	"prescripted_countries/00_unused_country.txt", # Vanilla
+	"common/inline_scripts/traditions/tr_purity_imperfection_remediation_wilderness.txt", # Vanilla bug
+	"prescripted_countries/00_unused_country.txt", # Vanilla bug
 	"failed to generate a ship class name for ship size", # ?
 	"Failed to read key reference Infernal from database", # Demon
 	"zz_ascension_perks_override.txt", # Giga
@@ -71,6 +77,7 @@ text_first_remove_list = [
 	"events/shroud_rising_settings_menu.txt line: 27", # Shroud
 	# "Missing localization key [good_trading]", # cultural_overhaul
 	"Missing effects tradition ap_galactic_contender", # UAP
+	"events/unique_ascension_perks_menu_events.txt line: 315", # UAP
 	"events/adt_gg_events.txt\" near line: 986", # ADT
 	"Invalid mega structure type [lgate_disabled]!", # ADT
 	"add_anomaly effect has invalid anomaly category delete_anomaly_slot at  file: events/anomalies_respawn_events.txt line:",
@@ -86,6 +93,7 @@ text_first_remove_list = [
 	"dmm_scripted_effects.txt", # DMM
 	"common/scripted_effects/prob_scripted_effects.txt:9", # PROB
 	"common/war_goals/prob_war_goal.txt\" near line: 10", # PROB
+	"Error in is_pop_category trigger, cannot find category with key:  file: events/machine_age_events_2.txt line", # SGF
 ]
 
 
@@ -142,6 +150,8 @@ text_important_warnings_list = [
 	"is unexpected",
 	": Unknown ",
 	"Corrupt Event Table Entry",
+	# "/civ",
+	# "'civ",
 ]
 
 def extra_warning(filename, text_list):

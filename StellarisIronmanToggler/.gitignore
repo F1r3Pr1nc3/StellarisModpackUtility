@@ -1,0 +1,11 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Stellaris Save Backups
+ironman_backup_*.sav
+
+# OS generated files
+.DS_Store
+Thumbs.db

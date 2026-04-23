@@ -37,7 +37,7 @@ new_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.3b")
 old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.3.14")
 new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
 #####
-old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2")
+old_version_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_update_maker\\Stellaris4.3b")
 new_version_folder = Path("d:\\Steam\\steamapps\\common\\Stellaris")
 old_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.2")
 new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.4.3")
@@ -45,12 +45,13 @@ new_log_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\logs\\Stellaris.logs.
 
 optional_mod_folder = Path("d:\\GOG Games\\Settings\\Stellaris\\Stellaris4.2_fix") # For scan_usage mode
 
-# Configuration - Add/Remove more categories if needed, e.g. # "variables", "menace_perks", "starbase_buildings", "jobs" , "starbase_modules", "inline_scripts"
+# Configuration - Add/Remove more categories if needed, e.g. # "variables", "menace_perks", "starbase_buildings"
 rename_chk_cats = { "buildings", "triggers", "effects", "traits", "civics", "modifiers", "traditions", "jobs" , "starbase_modules", "inline_scripts" }
+rename_chk_cats = { }
 scan_events = True
 scan_common = True
 scan_usage = False # of scripted triggers and effects
-do_logs = True
+do_logs = False
 debug = False
 
 # Logging Setup
@@ -113,8 +114,8 @@ def extract_event_ids(folder: Path):
 	if not folder.exists():
 		return event_ids
 
-	event_block_pattern = re.compile(r'^\w*?event = \{', re.MULTILINE)
-	id_pattern = re.compile(r'^\s+id = ([\w.\-]+)', re.MULTILINE)
+	event_block_pattern = re.compile(r'^ ?\w*?event\s*=\s*\{', re.MULTILINE)
+	id_pattern = re.compile(r'^\s+id\s*=\s*\"?([\w.\-]+)\"?', re.MULTILINE)
 
 	for file_path in folder.iterdir():
 		if file_path.suffix != ".txt":
@@ -422,18 +423,18 @@ def compare_stellaris_data(old_path: Path, new_path: Path, mod_path: Path = None
 		global_usage_counter = count_global_usages(new_path)
 
 	category_configs = {
-		"traits":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traits"), 0.62),
-		"techs":			(re.compile(r'^(tech_\w+) = \{', re.MULTILINE), Path("common/technology"), 0.62),
-		"triggers":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_triggers"), 0.62),
-		"traditions":		(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/traditions"), 0.62),
-		"effects":			(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/scripted_effects"), 0.62),
-		"jobs":				(re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/pop_jobs"), 0.62),
-		"buildings":		(re.compile(r'^((?:building|holding)_\w+) = \{', re.MULTILINE), Path("common/buildings"), 0.62),
-		"menace_perks":		(re.compile(r'^(menp_\w+) = \{', re.MULTILINE), Path("common/menace_perks"), 0.62),
-		"starbase_buildings": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_buildings"), 0.62),
-		"starbase_modules": (re.compile(r'^(\w+) = \{', re.MULTILINE), Path("common/starbase_modules"), 0.62),
-		"districts":		(re.compile(r'^(district_\w+) = \{', re.MULTILINE), Path("common/districts"), 0.62),
-		"civics":			(re.compile(r'^((?:civic|origin)_\w+) = \{', re.MULTILINE), Path("common/governments/civics"), 0.62),
+		"traits":			(re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/traits"), 0.62),
+		"techs":			(re.compile(r'^(tech_\w+)\s*=\s*\{', re.MULTILINE), Path("common/technology"), 0.62),
+		"triggers":			(re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/scripted_triggers"), 0.62),
+		"traditions":		(re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/traditions"), 0.62),
+		"effects":			(re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/scripted_effects"), 0.62),
+		"jobs":				(re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/pop_jobs"), 0.62),
+		"buildings":		(re.compile(r'^((?:building|holding)_\w+)\s*=\s*\{', re.MULTILINE), Path("common/buildings"), 0.62),
+		"menace_perks":		(re.compile(r'^(menp_\w+)\s*=\s*\{', re.MULTILINE), Path("common/menace_perks"), 0.62),
+		"starbase_buildings": (re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/starbase_buildings"), 0.62),
+		"starbase_modules": (re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE), Path("common/starbase_modules"), 0.62),
+		"districts":		(re.compile(r'^(district_\w+)\s*=\s*\{', re.MULTILINE), Path("common/districts"), 0.62),
+		"civics":			(re.compile(r'^((?:civic|origin)_\w+)\s*=\s*\{', re.MULTILINE), Path("common/governments/civics"), 0.62),
 		"governments":		(re.compile(r'^(gov_\w+)\s*=\s*\{', re.MULTILINE), Path("common/governments"), 0.62),
 		"script_values":	(re.compile(r'^(\w+)\s*=', re.MULTILINE), Path("common/script_values"), 0.62),
 		"variables":		(re.compile(r'^@(\w+)\s*=', re.MULTILINE), Path("common/scripted_variables"), 0.62),
@@ -482,7 +483,7 @@ def compare_stellaris_data(old_path: Path, new_path: Path, mod_path: Path = None
 		Path("common/scripted_modifiers"),
 		Path("common/static_modifiers"),
 	]
-	pattern = re.compile(r'^(\w+) = \{', re.MULTILINE)
+	pattern = re.compile(r'^(\w+)\s*=\s*\{', re.MULTILINE)
 	old_mod_dirs = [old_path / p for p in modifier_paths]
 	new_mod_dirs = [new_path / p for p in modifier_paths]
 

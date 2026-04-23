@@ -128,7 +128,6 @@ localModPath = ["Realistic_Pirates", ["english", "polish", "japanese", "korean"]
 localModPath = ["Freebooter Origin", ["german", "russian", "spanish", "braz_por", "french", "polish", "japanese", "korean"]]
 localModPath = ["Loud But Deadly", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
 localModPath = ["The Sleeper 3", ["german", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]]
-localModPath = ["Potent_Rebellions", ["braz_por"], ["unrest_legacy"]]
 localModPath = ["Shroud Rising", ["german", "spanish", "braz_por", "french", "polish"]]
 localModPath = ["l-cluster_access", ["russian", "polish", "japanese", "korean"]]
 localModPath = ["ADeadlyTempest", ["polish", "korean"]]
@@ -137,7 +136,9 @@ localModPath = ["The Wandering Ghost", ["german", "russian", "spanish", "braz_po
 localModPath = ["TheGreatKhanExpanded", []]
 localModPath = ["Counter-Limited Armies Fix", []]
 localModPath = ["Cyberization_Fix", []]
-localModPath = ["Stellaris4.2_fix", []] # [Root.controller.GetResearcherPlural_lower]
+localModPath = ["Potent_Rebellions", []]
+localModPath = ["Stellaris4.3_fix", []] # [Root.controller.GetResearcherPlural_lower]
+
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]
 # local_OVERHAUL = ["german", "russian", "spanish", "braz_por", "french", "polish", "simp_chinese", "japanese", "korean"]
@@ -176,7 +177,7 @@ def paradox_yaml_load(text):
 		data = yaml.load(text)
 		return data, lang_key
 	except YAMLError as e:
-		print(f"YAML parsing error: {e}\n")
+		print(f"YAML parsing error {lang_key}: {e}\n")
 		# Try to extract the line number from the error message to provide more context
 		error_line_matches = re.findall(r"line (\d+)", str(e))
 		if len(error_line_matches) > 1:
@@ -291,7 +292,7 @@ def tr(s):
 	output_lines = []
 
 	# The first line is the language key, e.g., l_english:
-	lang_key = re.match(r"^\s*(l_\w+):", s)
+	lang_key = re.search(r"^(l_\w+):", s)
 	if not lang_key:
 		return s, False
 	else:
@@ -402,6 +403,7 @@ vanilla_locs = {}
 if load_vanilla_loc:
 	import tempfile
 	import json  # for temp file
+	stellaris_path = "d:\\Steam\\steamapps\\common\\Stellaris"
 
 	TMP_FILE = "vanillaLoc.json"
 	### fst chck th xsts a temp file
@@ -438,7 +440,14 @@ if load_vanilla_loc:
 
 	else:
 		### Read Stellaris path from registry
-		stellaris_path = os.getcwd()
+		if os.path.exists(
+			os.path.normpath(os.path.join(stellaris_path, "localisation"))
+		):
+			stellaris_path = os.path.normpath(
+				os.path.join(stellaris_path, "localisation")
+			)
+		else:
+			stellaris_path = os.getcwd()
 
 		if os.path.exists(
 			os.path.normpath(os.path.join(stellaris_path, "localisation"))
@@ -933,7 +942,7 @@ for filename in YML_FILES:
 				# THEN use the vanilla translation for this target language.
 				if load_vanilla_loc and key in vanilla_identical_keys and vanilla_locs.get(lang) and key in vanilla_locs[lang]:
 					vanilla_translation = vanilla_locs[lang][key]
-					if langDict.get(key) != vanilla_translation: # Only update if the translation is actually different
+					if langDict.get(key) and langDict.get(key) != vanilla_translation: # Only update if the translation is actually different
 						should_update = True
 						# Apply substitutions to the fetched vanilla translation
 						# This changes words from vanilla's term to your mod's term

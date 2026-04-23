@@ -1260,7 +1260,7 @@ def merge_factor0_modifiers(text: str, changed: bool, ACTUAL_STELLARIS_VERSION_F
 
 		if ACTUAL_STELLARIS_VERSION_FLOAT > 3.99 and insert_at:
 			block = block[:insert_at.start()] + block[insert_at.end():]
-			match_parent = match_parent[:block_coords[0]] + block + match_parent[block_coords[1]:]
+			# match_parent = match_parent[:block_coords[0]] + block + match_parent[block_coords[1]:]
 			logger.info(f"Removed obsolete modifier: {insert_at.group(0)}")
 			changed = True
 
