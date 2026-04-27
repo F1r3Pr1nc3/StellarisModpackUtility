@@ -11,6 +11,8 @@ import os
 import tempfile
 import glob
 import time
+import sys
+import argparse
 from datetime import date, datetime
 
 """
@@ -32,28 +34,32 @@ Code
 """
 
 
-def backup():
+def backup(target_file_path=None):
 	try:
-		original_filename = "ironman.sav"
-		target_file = None
-
-		if os.path.exists(original_filename):
-			target_file = original_filename
-			backup_filename = f"ironman_backup_{date.today()}_{timenow}.sav"
-			print(f"[INFO]: Renaming '{original_filename}' to '{backup_filename}'.")
-			os.rename(original_filename, backup_filename)
-			print("[INFO]: Backup via rename complete.")
-			target_file = backup_filename
-		else:
-			print(f"[WARN]: '{original_filename}' not found in current directory.")
-			backup_files = glob.glob("ironman_backup_*.sav")
-			if backup_files:
-				backup_files.sort(key=os.path.getmtime, reverse=True)
-				target_file = backup_files[0]
-				print(f"[INFO]: Falling back to latest backup file: '{target_file}'")
-			else:
-				print(f"[ERROR]: No '{original_filename}' or backup files found.")
+		if target_file_path:
+			if not os.path.exists(target_file_path):
+				print(f"[ERROR]: Specified file '{target_file_path}' not found.")
 				return
+			target_file = target_file_path
+		else:
+			original_filename = "ironman.sav"
+			if os.path.exists(original_filename):
+				target_file = original_filename
+				backup_filename = f"ironman_backup_{date.today()}_{timenow}.sav"
+				print(f"[INFO]: Renaming '{original_filename}' to '{backup_filename}'.")
+				os.rename(original_filename, backup_filename)
+				print("[INFO]: Backup via rename complete.")
+				target_file = backup_filename
+			else:
+				print(f"[WARN]: '{original_filename}' not found in current directory.")
+				backup_files = glob.glob("ironman_backup_*.sav")
+				if backup_files:
+					backup_files.sort(key=os.path.getmtime, reverse=True)
+					target_file = backup_files[0]
+					print(f"[INFO]: Falling back to latest backup file: '{target_file}'")
+				else:
+					print(f"[ERROR]: No '{original_filename}' or backup files found.")
+					return
 
 		with tempfile.TemporaryDirectory() as tempdir:
 			print(f"[INFO]: Using temporary directory: {tempdir}")
@@ -91,7 +97,6 @@ def save_edit(tempdir):
 				continue
 
 			if file_name == "meta":
-				# Meta is small, standard line processing is fine
 				with open(in_path, "r", encoding="utf-8", errors="ignore") as infile, \
 					 open(out_path, "w", encoding="utf-8") as outfile:
 					in_dlc_block = False
@@ -116,15 +121,10 @@ def save_edit(tempdir):
 						else:
 							outfile.write(line)
 			else:
-				# Gamestate Tail-Stream Optimization
-				# 1. Process the Top (DLC block) in binary mode
-				# 2. Bulk copy the middle (binary)
-				# 3. Process the Tail (Settings)
 				file_size = os.path.getsize(in_path)
-				tail_size = 25 * 1024 * 1024 # Last 25MB contains galaxy and settings
+				tail_size = 25 * 1024 * 1024 
 
 				with open(in_path, "rb") as infile, open(out_path, "wb") as outfile:
-					# --- Part A: DLC Block (Top of file) ---
 					in_dlc_block = False
 					dlcs_b = [d.encode('utf-8') for d in dlcs_to_remove]
 
@@ -136,30 +136,28 @@ def save_edit(tempdir):
 						if in_dlc_block:
 							if line.strip() == b"}":
 								outfile.write(line)
-								break # Exit DLC loop
+								break
 							if any(d in line for d in dlcs_b):
 								continue
 							outfile.write(line)
 							continue
 						outfile.write(line)
 
-					# --- Part B: Bulk Copy Middle ---
 					current_pos = infile.tell()
 					end_pos = max(current_pos, file_size - tail_size)
 					bytes_to_copy = end_pos - current_pos
 
 					if bytes_to_copy > 0:
 						print(f"[INFO]: Bulk-streaming {bytes_to_copy // (1024*1024)}MB of data...")
-						chunk_size = 8 * 1024 * 1024 # 8MB chunks
+						chunk_size = 8 * 1024 * 1024
 						while bytes_to_copy > 0:
 							chunk = infile.read(min(chunk_size, bytes_to_copy))
 							if not chunk: break
 							outfile.write(chunk)
 							bytes_to_copy -= len(chunk)
 
-					# --- Part C: Process Tail in memory ---
 					print("[INFO]: Processing last 25MB of gamestate...")
-					tail_lines = infile.readlines() # Reads remaining bytes as list
+					tail_lines = infile.readlines()
 
 					settings_to_replace = {
 						b"\tcrises=": (b"	crises=1\n", "crisis reference"),
@@ -207,7 +205,7 @@ def save_edit(tempdir):
 
 def insertion(tempdir):
 	try:
-		new_save_name = f"{save_folder_name}.sav"
+		new_save_name = f"{save_folder_name}_modded.sav"
 		new_save_path = os.path.join(current_dir, new_save_name)
 		with ZipFile(new_save_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=5) as ZipFolder:
 			print(f"[INFO]: Creating new save file: {new_save_path}")
@@ -221,7 +219,13 @@ def insertion(tempdir):
 
 
 if __name__ == "__main__":
+	parser = argparse.ArgumentParser(description="Stellaris Save-Stream Toggler")
+	parser.add_argument("file", nargs="?", help="Path to the ironman.sav file")
+	args = parser.parse_args()
+
 	start_time = time.time()
-	backup()
+	backup(args.file)
 	print(f"[INFO]: Total script time: {time.time() - start_time:.2f} seconds.")
-	input("[INFO]: DONE. PRESS ENTER TO EXIT PROGRAM")
+	
+	if os.name != 'posix':
+		input("[INFO]: DONE. PRESS ENTER TO EXIT PROGRAM")
