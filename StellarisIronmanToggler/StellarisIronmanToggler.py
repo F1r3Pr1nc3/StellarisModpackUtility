@@ -4,6 +4,12 @@
 # 
 # Features: Binary Streaming, C-Level Prefix Matching, Early-Exit
 # Optimization: 22s -> 2.4s (900% improvement)
+#
+# --- HOW TO USE ---
+# 1. Open your terminal/command prompt (CMD, PowerShell, or Bash).
+# 2. Navigate to the folder containing this script using: cd "path/to/folder"
+# 3. Run the script using Python: python StellarisIronmanToggler.py
+# 4. Optional: Provide a specific save file: python StellarisIronmanToggler.py "my_save.sav"
 # =================================================================
 
 import zipfile
