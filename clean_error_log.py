@@ -54,6 +54,7 @@ text_to_remove_list = [
 		"", # Vanilla
 		# "Trigger count_owned_pop_amount cannot be used in this context", # Vanilla
 		"[fleet], file: common/storm_types/00_storm_types.txt", # Vanilla
+		"Found invalid DLC", # Vanilla
 ]
 # very specific one-liner
 text_first_remove_list = [

@@ -137,7 +137,7 @@ localModPath = ["TheGreatKhanExpanded", []]
 localModPath = ["Counter-Limited Armies Fix", []]
 localModPath = ["Cyberization_Fix", []]
 localModPath = ["Potent_Rebellions", []]
-localModPath = ["Stellaris4.3_fix", []] # [Root.controller.GetResearcherPlural_lower]
+localModPath = ["Stellaris4.3_fix", [], ["dux_replace"]] # [Root.controller.GetResearcherPlural_lower]
 
 
 # localModPath = ["c:\\Games\\steamapps\\workshop\\cd:\GOG Games\Settings\Mods\The Sleeper 2 - Fallen Hivemind\ontent\\281990\\2268189539\\", ["braz_por"]]

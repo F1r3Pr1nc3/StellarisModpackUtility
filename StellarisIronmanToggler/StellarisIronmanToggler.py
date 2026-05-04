@@ -1,7 +1,7 @@
 # =================================================================
 # Stellaris Save-Stream Toggler
 # High-Performance Save Manipulation Utility
-# 
+#
 # Features: Binary Streaming, C-Level Prefix Matching, Early-Exit
 # Optimization: 22s -> 2.4s (900% improvement)
 #
@@ -38,24 +38,30 @@ save_folder_name = os.path.basename(current_dir)
 Code
 ========
 """
-
+ironman_toggle = False
 
 def backup(target_file_path=None):
+	global ironman_toggle
+	ironman_filename = "ironman"
+	original_filename = "ironman.sav"
 	try:
 		if target_file_path:
 			if not os.path.exists(target_file_path):
 				print(f"[ERROR]: Specified file '{target_file_path}' not found.")
 				return
 			target_file = target_file_path
+			if target_file.endswith(original_filename) or target_file.startswith(ironman_filename):
+				ironman_toggle = True
+				print("[INFO]: ironman toggle enabled.")
 		else:
-			original_filename = "ironman.sav"
 			if os.path.exists(original_filename):
 				target_file = original_filename
-				backup_filename = f"ironman_backup_{date.today()}_{timenow}.sav"
+				backup_filename = f"{ironman_filename}_backup_{date.today()}_{timenow}.sav"
 				print(f"[INFO]: Renaming '{original_filename}' to '{backup_filename}'.")
 				os.rename(original_filename, backup_filename)
 				print("[INFO]: Backup via rename complete.")
 				target_file = backup_filename
+				ironman_toggle = True
 			else:
 				print(f"[WARN]: '{original_filename}' not found in current directory.")
 				backup_files = glob.glob("ironman_backup_*.sav")
@@ -63,6 +69,7 @@ def backup(target_file_path=None):
 					backup_files.sort(key=os.path.getmtime, reverse=True)
 					target_file = backup_files[0]
 					print(f"[INFO]: Falling back to latest backup file: '{target_file}'")
+					ironman_toggle = True
 				else:
 					print(f"[ERROR]: No '{original_filename}' or backup files found.")
 					return
@@ -88,10 +95,21 @@ def extraction(source_file, tempdir):
 def save_edit(tempdir):
 	try:
 		dlcs_to_remove = [
-			'"Rick The Cube Species Portrait"',
+			'"Anniversary Portraits"',
+			# '"Astral Planes"',
+			'"Aquatics Species Pack"',
+			'"BioGenesis"',
 			'"Cosmic Storms"',
-			'"BioGenesis"'
+			# '"Megacorp"',
+			'"Rick The Cube Species Portrait"',
+			'"Stargazer Species Portrait"',
 		]
+
+		ironman_to_replace = {
+			b"\tironman=yes": (b"	ironman=no\n", "ironman (Disabling)"),
+			b"\tironman=no": (b"	ironman=yes\n", "ironman (Enabling)")
+		} if ironman_toggle else {}
+
 
 		for file_name in ["meta", "gamestate"]:
 			print(f"[INFO]: Reading {file_name} file & preparing changes")
@@ -120,15 +138,18 @@ def save_edit(tempdir):
 								continue
 							outfile.write(line)
 							continue
-						if line.startswith("ironman=yes"):
-							outfile.write("ironman=no\n")
-						elif line.startswith("ironman=no"):
-							outfile.write("ironman=yes\n")
+						if ironman_toggle:
+							if line.startswith("ironman=yes"):
+								outfile.write("ironman=no\n")
+							elif line.startswith("ironman=no"):
+								outfile.write("ironman=yes\n")
+							else:
+								outfile.write(line)
 						else:
 							outfile.write(line)
 			else:
 				file_size = os.path.getsize(in_path)
-				tail_size = 25 * 1024 * 1024 
+				tail_size = 25 * 1024 * 1024
 
 				with open(in_path, "rb") as infile, open(out_path, "wb") as outfile:
 					in_dlc_block = False
@@ -169,10 +190,9 @@ def save_edit(tempdir):
 						b"\tcrises=": (b"	crises=1\n", "crisis reference"),
 						b"additional_crisis_strength=": (b"additional_crisis_strength=2\n", "additional_crisis_strength"),
 						b"\tdifficulty=": (b"	difficulty=admiral\n", "difficulty reference"),
-						b"\taggressiveness=": (b"	aggressiveness=high\n", "aggressiveness reference"),
-						b"\tironman=yes": (b"	ironman=no\n", "ironman (Disabling)"),
-						b"\tironman=no": (b"	ironman=yes\n", "ironman (Enabling)")
+						b"\taggressiveness=": (b"	aggressiveness=high\n", "aggressiveness reference")
 					}
+					settings_to_replace.update(ironman_to_replace)
 
 					settings_found = 0
 					settings_to_find = 5
@@ -232,6 +252,6 @@ if __name__ == "__main__":
 	start_time = time.time()
 	backup(args.file)
 	print(f"[INFO]: Total script time: {time.time() - start_time:.2f} seconds.")
-	
+
 	if os.name != 'posix':
 		input("[INFO]: DONE. PRESS ENTER TO EXIT PROGRAM")
