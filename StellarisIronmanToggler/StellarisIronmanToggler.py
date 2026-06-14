@@ -40,7 +40,7 @@ Code
 """
 ironman_toggle = False
 
-def backup(target_file_path=None):
+def backup(target_file_path=None, force_toggle=False):
 	global ironman_toggle
 	ironman_filename = "ironman"
 	original_filename = "ironman.sav"
@@ -50,29 +50,37 @@ def backup(target_file_path=None):
 				print(f"[ERROR]: Specified file '{target_file_path}' not found.")
 				return
 			target_file = target_file_path
-			if target_file.endswith(original_filename) or target_file.startswith(ironman_filename):
+			if force_toggle or "ironman" in os.path.basename(target_file).lower():
 				ironman_toggle = True
 				print("[INFO]: ironman toggle enabled.")
-		else:
-			if os.path.exists(original_filename):
-				target_file = original_filename
-				backup_filename = f"{ironman_filename}_backup_{date.today()}_{timenow}.sav"
-				print(f"[INFO]: Renaming '{original_filename}' to '{backup_filename}'.")
-				os.rename(original_filename, backup_filename)
-				print("[INFO]: Backup via rename complete.")
-				target_file = backup_filename
-				ironman_toggle = True
 			else:
-				print(f"[WARN]: '{original_filename}' not found in current directory.")
-				backup_files = glob.glob("ironman_backup_*.sav")
-				if backup_files:
-					backup_files.sort(key=os.path.getmtime, reverse=True)
-					target_file = backup_files[0]
-					print(f"[INFO]: Falling back to latest backup file: '{target_file}'")
-					ironman_toggle = True
-				else:
-					print(f"[ERROR]: No '{original_filename}' or backup files found.")
+				print("[INFO]: ironman toggle disabled for this file (use --force-toggle to enable).")
+				print("[INFO]: ironman toggle enabled.")
+		else:
+			sav_files = glob.glob("*.sav")
+			if not sav_files:
+				print("[ERROR]: No .sav files found in current directory.")
+				return
+			
+			if len(sav_files) == 1:
+				target_file = sav_files[0]
+				print(f"[INFO]: Found exactly one .sav file: '{target_file}'")
+			else:
+				print("[INFO]: Multiple .sav files found. Please select one:")
+				display_count = min(len(sav_files), 3)
+				for i in range(display_count):
+					print(f"[{i + 1}] {sav_files[i]}")
+				choice = input(f"Select a file (1-{display_count}): ").strip()
+				if not choice.isdigit() or not (1 <= int(choice) <= display_count):
+					print("[ERROR]: Invalid selection.")
 					return
+				target_file = sav_files[int(choice) - 1]
+
+			if force_toggle or "ironman" in os.path.basename(target_file).lower():
+				ironman_toggle = True
+				print("[INFO]: ironman toggle enabled.")
+			else:
+				print("[INFO]: ironman toggle disabled for this file (use --force-toggle to enable).")
 
 		with tempfile.TemporaryDirectory() as tempdir:
 			print(f"[INFO]: Using temporary directory: {tempdir}")
@@ -105,10 +113,16 @@ def save_edit(tempdir):
 			'"Stargazer Species Portrait"',
 		]
 
-		ironman_to_replace = {
-			b"\tironman=yes": (b"	ironman=no\n", "ironman (Disabling)"),
-			b"\tironman=no": (b"	ironman=yes\n", "ironman (Enabling)")
-		} if ironman_toggle else {}
+		if ironman_toggle:
+			ironman_to_replace = {
+				b"\tironman=yes": (b"\tironman=no\n", "ironman (Disabling)"),
+				b"\tironman=no": (b"\tironman=yes\n", "ironman (Enabling)")
+			}
+		else:
+			ironman_to_replace = {
+				b"\tironman=yes": (b"\tironman=no\n", "ironman (Forcing Disable)"),
+				b"\tironman=no": (b"\tironman=no\n", "ironman (Already Disabled)")
+			}
 
 
 		for file_name in ["meta", "gamestate"]:
@@ -138,13 +152,11 @@ def save_edit(tempdir):
 								continue
 							outfile.write(line)
 							continue
-						if ironman_toggle:
-							if line.startswith("ironman=yes"):
-								outfile.write("ironman=no\n")
-							elif line.startswith("ironman=no"):
+						if line.startswith("ironman="):
+							if ironman_toggle and line.startswith("ironman=no"):
 								outfile.write("ironman=yes\n")
 							else:
-								outfile.write(line)
+								outfile.write("ironman=no\n")
 						else:
 							outfile.write(line)
 			else:
@@ -247,10 +259,11 @@ def insertion(tempdir):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Stellaris Save-Stream Toggler")
 	parser.add_argument("file", nargs="?", help="Path to the ironman.sav file")
+	parser.add_argument("--force-toggle", action="store_true", help="Force ironman toggle regardless of filename")
 	args = parser.parse_args()
 
 	start_time = time.time()
-	backup(args.file)
+	backup(args.file, args.force_toggle)
 	print(f"[INFO]: Total script time: {time.time() - start_time:.2f} seconds.")
 
 	if os.name != 'posix':
